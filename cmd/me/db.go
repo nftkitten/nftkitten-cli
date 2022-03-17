@@ -96,8 +96,16 @@ func dbQuery(db *sql.DB, text string) ([]map[string]interface{}, error) {
 		switch columnTypes[i].DatabaseTypeName() {
 		case "BOOL":
 			defValues[i] = new(sql.NullBool)
-		case "INT4":
+		case "BIT", "VARBIT":
+			defValues[i] = new(sql.NullByte)
+		case "DECIMAL", "FLOAT8", "FLOAT4", "MONEY", "NUMERIC", "REAL":
+			defValues[i] = new(sql.NullFloat64)
+		case "INT2", "SERIAL2":
+			defValues[i] = new(sql.NullInt32)
+		case "INT", "INT4", "INT8", "SERIAL", "SERIAL4", "SERIAL8":
 			defValues[i] = new(sql.NullInt64)
+		case "TIMETZ", "TIME":
+			defValues[i] = new(sql.NullTime)
 		default:
 			defValues[i] = new(sql.NullString)
 		}
