@@ -121,8 +121,16 @@ func dbQuery(db *sql.DB, text string) ([]map[string]interface{}, error) {
 		for i := 0; i < count; i++ {
 			if val, ok := scanArgs[i].(sql.NullBool); ok {
 				row[columns[i]] = val.Bool
+			} else if val, ok := scanArgs[i].(sql.NullByte); ok {
+				row[columns[i]] = val.Byte
+			} else if val, ok := scanArgs[i].(sql.NullFloat64); ok {
+				row[columns[i]] = val.Float64
+			} else if val, ok := scanArgs[i].(sql.NullInt32); ok {
+				row[columns[i]] = val.Int32
 			} else if val, ok := scanArgs[i].(sql.NullInt64); ok {
 				row[columns[i]] = val.Int64
+			} else if val, ok := scanArgs[i].(sql.NullTime); ok {
+				row[columns[i]] = val.Time
 			} else if val, ok := scanArgs[i].(sql.NullString); ok {
 				row[columns[i]] = val.String
 			} else {
@@ -138,7 +146,7 @@ func dbQuery(db *sql.DB, text string) ([]map[string]interface{}, error) {
 }
 
 func dbQueryScanLog(db *sql.DB) map[string]bool {
-	cmd := `SELECT id FROM me_scan_log WHERE scanned_at >= NOW() - INTERVAL '24 HOURS'`
+	cmd := `SELECT id FROM me_scan_log`
 	rows, err := dbQuery(db, cmd)
 	if err != nil {
 		panic(err)
