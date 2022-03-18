@@ -33,7 +33,8 @@ var Cmd = &cobra.Command{
 			os.Getenv("PGDATABASE"),
 			"?sslmode=disable",
 		)
-		db, err := sql.Open("postgres", connStr)
+		var err error
+		db, err = sql.Open("postgres", connStr)
 		if err != nil {
 			log.Fatal(err)
 		}
