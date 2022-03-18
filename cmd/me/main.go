@@ -52,16 +52,16 @@ func execute(force bool) {
 	fmt.Println(url)
 
 	fmt.Println(`initialize lookups`)
-	scanned := dbQueryScanLog(db)
+	scanned := dbQueryScanLog()
 
 	// tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing
 	// UNION SELECT DISTINCT CAST(data->'mintAddress' AS text) AS id FROM me_wallet_token
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_activity
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_made
-	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_received`, db)
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_received`)
 	// 	tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
-	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing`, db)
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing`)
 
 	// walletSet := dbQueryIdSet(`SELECT DISTINCT wallet_id AS id FROM me_wallet_token
 	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_collection_activity
@@ -71,7 +71,7 @@ func execute(force bool) {
 	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_listing
 	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_wallet_activity
 	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_offer_received
-	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`, db)
+	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`)
 
 	fmt.Println(`initialize streams`)
 	launchpadPub := make(chan rxgo.Item)
