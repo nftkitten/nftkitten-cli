@@ -13,7 +13,7 @@ func subscribeCollectionListing(
 	symbol string,
 	db *sql.DB,
 	tokenMintsPub chan rxgo.Item,
-	walletAddressesPub chan rxgo.Item,
+	// walletAddressesPub chan rxgo.Item,
 ) func(interface{}) {
 	return func(item interface{}) {
 		m := item.(map[string]interface{})
@@ -27,13 +27,13 @@ func subscribeCollectionListing(
 				pdaAddress,
 			),
 			sqlForUpsertScanLog("collection_listing", fmt.Sprint(symbol, ".", pdaAddress)),
-		).ForEach(doNothingOnNext, logError, doNothing))
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		if fmt.Sprint(m["tokenMint"]) != "" {
 			tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
 		}
-		if fmt.Sprint(m["seller"]) != "" {
-			walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["seller"])}
-		}
+		// if fmt.Sprint(m["seller"]) != "" {
+		// 	walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["seller"])}
+		// }
 	}
 }
 
@@ -42,7 +42,7 @@ func subscribeCollectionActivity(
 	symbol string,
 	db *sql.DB,
 	tokenMintsPub chan rxgo.Item,
-	walletAddressesPub chan rxgo.Item,
+	// walletAddressesPub chan rxgo.Item,
 ) func(interface{}) {
 	return func(item interface{}) {
 		m := item.(map[string]interface{})
@@ -58,16 +58,16 @@ func subscribeCollectionActivity(
 				signature,
 			),
 			sqlForUpsertScanLog("collection_activity", fmt.Sprint(symbol, ".", signature)),
-		).ForEach(doNothingOnNext, logError, doNothing))
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		if fmt.Sprint(m["tokenMint"]) != "" {
 			tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
 		}
-		if fmt.Sprint(m["buyer"]) != "" {
-			walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["buyer"])}
-		}
-		if fmt.Sprint(m["seller"]) != "" {
-			walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["seller"])}
-		}
+		// if fmt.Sprint(m["buyer"]) != "" {
+		// 	walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["buyer"])}
+		// }
+		// if fmt.Sprint(m["seller"]) != "" {
+		// 	walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["seller"])}
+		// }
 	}
 }
 
@@ -87,7 +87,7 @@ func subscribeCollectionStat(
 				bytes,
 			),
 			sqlForUpsertScanLog("collection_stat", symbol),
-		).ForEach(doNothingOnNext, logError, doNothing))
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 	}
 }
 
@@ -96,7 +96,7 @@ func subscribeCollection(
 	db *sql.DB,
 	url string,
 	tokenMintsPub chan rxgo.Item,
-	walletAddressesPub chan rxgo.Item,
+	// walletAddressesPub chan rxgo.Item,
 ) func(item interface{}) {
 	return func(item interface{}) {
 		m := item.(map[string]interface{})
@@ -106,12 +106,14 @@ func subscribeCollection(
 			db,
 			sqlForUpsert("collection", "", symbol, bytes),
 			sqlForUpsertScanLog("collection", symbol),
-		).ForEach(doNothingOnNext, logError, doNothing))
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/listings"), 20).
-			ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub, walletAddressesPub), logError, doNothing))
+			// ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub), logError, doNothing, rxgo.WithCPUPool()))
 		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/activities"), 500).
-			ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub, walletAddressesPub), logError, doNothing))
+			// ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub, walletAddressesPub, rxgo.WithCPUPool()), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub), logError, doNothing, rxgo.WithCPUPool()))
 		*pool = append(*pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
-			ForEach(subscribeCollectionStat(pool, symbol, db), logError, doNothing))
+			ForEach(subscribeCollectionStat(pool, symbol, db), logError, doNothing, rxgo.WithCPUPool()))
 	}
 }

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+
+	"github.com/reactivex/rxgo/v2"
 )
 
 func subscribeLaunchpad(db *sql.DB) func(interface{}) {
@@ -15,6 +17,6 @@ func subscribeLaunchpad(db *sql.DB) func(interface{}) {
 			db,
 			sqlForUpsert("launchpad", "", symbol, bytes),
 			sqlForUpsertScanLog("launchpad", symbol),
-		).ForEach(doNothingOnNext, logError, doNothing)
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool())
 	}
 }

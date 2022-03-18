@@ -48,43 +48,48 @@ func execute(db *sql.DB, force bool) {
 	fmt.Println(`initialize lookups`)
 	scanned := dbQueryScanLog(db)
 
+	// tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing
+	// UNION SELECT DISTINCT CAST(data->'mintAddress' AS text) AS id FROM me_wallet_token
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_activity
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_made
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_received`, db)
 	tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
-UNION SELECT DISTINCT CAST(data->'mintAddress' AS text) AS id FROM me_wallet_token
-UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_activity
-UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_made
-UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_received`, db)
+UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing`, db)
 
-	walletSet := dbQueryIdSet(`SELECT DISTINCT wallet_id AS id FROM me_wallet_token
-UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_collection_activity
-UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_activity
-UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_offers_made
-UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_offers_received
-UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_listing
-UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_wallet_activity
-UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_offer_received
-UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`, db)
+	// walletSet := dbQueryIdSet(`SELECT DISTINCT wallet_id AS id FROM me_wallet_token
+	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_collection_activity
+	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_activity
+	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_offers_made
+	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_wallet_offers_received
+	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_listing
+	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_wallet_activity
+	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_offer_received
+	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`, db)
 
 	fmt.Println(`initialize streams`)
 	launchpadPub := make(chan rxgo.Item)
 	collectionPub := make(chan rxgo.Item)
 	tokenMintsPub := make(chan rxgo.Item)
-	walletAddressesPub := make(chan rxgo.Item)
+	// walletAddressesPub := make(chan rxgo.Item)
 	var pool []rxgo.Disposed
 
 	fmt.Println(`observe streams`)
 	pool = append(pool, rxgo.FromChannel(launchpadPub).
-		ForEach(subscribeLaunchpad(db), logError, doNothing))
-	pool = append(pool, rxgo.FromChannel(walletAddressesPub).
-		Filter(filterWallet(force, scanned)).
-		Distinct(distinctByValue).
-		ForEach(subscribeWallet(&pool, db, url), logError, doNothing))
+		ForEach(subscribeLaunchpad(db), logError, doNothing, rxgo.WithCPUPool()))
+	// pool = append(pool, rxgo.FromChannel(walletAddressesPub).
+	// 	Filter(filterWallet(force, scanned)).
+	// 	Distinct(distinctByValue).
+	// 	ForEach(subscribeWallet(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(tokenMintsPub).
 		Filter(filterToken(force, scanned)).
 		Distinct(distinctByValue).
-		ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing))
+		// ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeToken(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
 		Filter(filterCollection(force, scanned)).
-		ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, walletAddressesPub), logError, doNothing))
+		// ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(&pool, db, url, tokenMintsPub), logError, doNothing, rxgo.WithCPUPool()))
 
 	fmt.Println(`produce events`)
 	go func() {
@@ -95,9 +100,9 @@ UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`
 			tokenMintsPub <- rxgo.Item{V: id}
 		}
 
-		for id := range walletSet {
-			walletAddressesPub <- rxgo.Item{V: id}
-		}
+		// for id := range walletSet {
+		// 	walletAddressesPub <- rxgo.Item{V: id}
+		// }
 	}()
 
 	log.Println("wait.")

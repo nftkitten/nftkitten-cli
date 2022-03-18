@@ -9,7 +9,7 @@ import (
 	"go.uber.org/ratelimit"
 )
 
-var dbRateLimit ratelimit.Limiter = ratelimit.New(5) // per second
+var dbRateLimit ratelimit.Limiter = ratelimit.New(50) // per second
 
 func sqlForUpsert(
 	obj string,
