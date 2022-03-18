@@ -1,7 +1,6 @@
 package me
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 
@@ -9,8 +8,6 @@ import (
 )
 
 func subscribeCollection(
-	pool *[]rxgo.Disposed,
-	db *sql.DB,
 	url string,
 	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
@@ -22,27 +19,24 @@ func subscribeCollection(
 		symbol := fmt.Sprint(m["symbol"])
 		scanId := fmt.Sprint("collection.", symbol)
 		if filter(scanId) {
-			*pool = append(*pool, dbExecuteMany(
-				db,
+			pool = append(pool, dbExecuteMany(
 				sqlForUpsert("collection", "", symbol, bytes),
 				sqlForUpsertScanLog(scanId),
 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		}
-		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/listings"), 20).
-			// ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-			ForEach(subscribeCollectionListing(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/activities"), 500).
-			// ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub, walletAddressesPub, rxgo.WithCPUPool()), logError, doNothing, rxgo.WithCPUPool()))
-			ForEach(subscribeCollectionActivity(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-		*pool = append(*pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
-			ForEach(subscribeCollectionStat(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
+		pool = append(pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/listings"), 20).
+			// ForEach(subscribeCollectionListing(symbol, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionListing(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
+		pool = append(pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/activities"), 500).
+			// ForEach(subscribeCollectionActivity(symbol, tokenMintsPub, walletAddressesPub, rxgo.WithCPUPool()), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionActivity(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
+		pool = append(pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
+			ForEach(subscribeCollectionStat(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
 	}
 }
 
 func subscribeCollectionListing(
-	pool *[]rxgo.Disposed,
 	symbol string,
-	db *sql.DB,
 	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
 	filter func(string) bool,
@@ -53,8 +47,7 @@ func subscribeCollectionListing(
 		pdaAddress := fmt.Sprint(m["pdaAddress"])
 		scanId := fmt.Sprint("collection_listing.", symbol, ".", pdaAddress)
 		if filter(scanId) {
-			*pool = append(*pool, dbExecuteMany(
-				db,
+			pool = append(pool, dbExecuteMany(
 				sqlForUpsertWithParent("collection", "listing",
 					symbol,
 					bytes,
@@ -73,9 +66,7 @@ func subscribeCollectionListing(
 }
 
 func subscribeCollectionActivity(
-	pool *[]rxgo.Disposed,
 	symbol string,
-	db *sql.DB,
 	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
 	filter func(string) bool,
@@ -86,8 +77,7 @@ func subscribeCollectionActivity(
 		signature := fmt.Sprint(m["signature"])
 		scanId := fmt.Sprint("collection_activity.", symbol, ".", signature)
 		if filter(scanId) {
-			*pool = append(*pool, dbExecuteMany(
-				db,
+			pool = append(pool, dbExecuteMany(
 				sqlForUpsertWithParent(
 					"collection",
 					"activity",
@@ -111,17 +101,14 @@ func subscribeCollectionActivity(
 }
 
 func subscribeCollectionStat(
-	pool *[]rxgo.Disposed,
 	symbol string,
-	db *sql.DB,
 	filter func(string) bool,
 ) func(interface{}) {
 	return func(item interface{}) {
 		bytes, _ := json.Marshal(item)
 		scanId := fmt.Sprint("collection_stat.", symbol)
 		if filter(scanId) {
-			*pool = append(*pool, dbExecuteMany(
-				db,
+			pool = append(pool, dbExecuteMany(
 				sqlForUpsert(
 					"collection_stat",
 					"collection_",

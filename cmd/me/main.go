@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/spf13/cobra"
 
 	_ "github.com/lib/pq"
 	"github.com/reactivex/rxgo/v2"
 )
+
+var wg sync.WaitGroup
+var pool []rxgo.Disposed
+var db *sql.DB
 
 var Cmd = &cobra.Command{
 	Use:   "me",
@@ -32,8 +37,9 @@ var Cmd = &cobra.Command{
 		if err != nil {
 			log.Fatal(err)
 		}
-		execute(db, force)
+		execute(force)
 		db.Close()
+		db = nil
 	},
 }
 
@@ -41,7 +47,7 @@ func init() {
 	Cmd.Flags().Bool("force", false, "Rescan new content")
 }
 
-func execute(db *sql.DB, force bool) {
+func execute(force bool) {
 	url := os.Getenv("API_BASE_URL")
 	fmt.Println(url)
 
@@ -72,21 +78,20 @@ func execute(db *sql.DB, force bool) {
 	collectionPub := make(chan rxgo.Item)
 	// tokenMintsPub := make(chan rxgo.Item)
 	// walletAddressesPub := make(chan rxgo.Item)
-	var pool []rxgo.Disposed
 
 	fmt.Println(`observe streams`)
 	pool = append(pool, rxgo.FromChannel(launchpadPub).
-		ForEach(subscribeLaunchpad(&pool, db, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeLaunchpad(filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	// pool = append(pool, rxgo.FromChannel(walletAddressesPub).
 	// 	Distinct(distinctByValue).
-	// 	ForEach(subscribeWallet(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
+	// 	ForEach(subscribeWallet(url), logError, doNothing, rxgo.WithCPUPool()))
 	// pool = append(pool, rxgo.FromChannel(tokenMintsPub).
 	// 	Distinct(distinctByValue).
-	// 	// ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-	// 	ForEach(subscribeToken(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+	// 	// ForEach(subscribeToken(url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+	// 	ForEach(subscribeToken(url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
-		// ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeCollection(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		// ForEach(subscribeCollection(url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 
 	fmt.Println(`produce events`)
 	go func() {
@@ -108,6 +113,6 @@ func execute(db *sql.DB, force bool) {
 		<-disposed
 	}
 
-	db.Close()
+	pool = nil
 	log.Println("reload completed.")
 }

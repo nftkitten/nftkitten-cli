@@ -53,7 +53,7 @@ func printCommand(command queryCommand) {
 	}
 }
 
-func dbExecute(db *sql.DB, command queryCommand) (sql.Result, error) {
+func dbExecute(command queryCommand) (sql.Result, error) {
 	dbRateLimit.Take()
 	args := command.values
 	stmt, err := db.Prepare(command.text)
@@ -70,7 +70,7 @@ func dbExecute(db *sql.DB, command queryCommand) (sql.Result, error) {
 	return res, nil
 }
 
-func dbQuery(db *sql.DB, text string) ([]map[string]interface{}, error) {
+func dbQuery(text string) ([]map[string]interface{}, error) {
 	dbRateLimit.Take()
 	rows, err := db.Query(text)
 	if err != nil {
@@ -145,9 +145,9 @@ func dbQuery(db *sql.DB, text string) ([]map[string]interface{}, error) {
 	return results, nil
 }
 
-func dbQueryScanLog(db *sql.DB) map[string]bool {
+func dbQueryScanLog() map[string]bool {
 	cmd := `SELECT id FROM me_scan_log`
-	rows, err := dbQuery(db, cmd)
+	rows, err := dbQuery(cmd)
 	if err != nil {
 		panic(err)
 	}
@@ -158,8 +158,8 @@ func dbQueryScanLog(db *sql.DB) map[string]bool {
 	return res
 }
 
-func dbQueryIdSet(text string, db *sql.DB) map[string]bool {
-	rows, err := dbQuery(db, text)
+func dbQueryIdSet(text string) map[string]bool {
+	rows, err := dbQuery(text)
 	if err != nil {
 		panic(err)
 	}
@@ -170,11 +170,11 @@ func dbQueryIdSet(text string, db *sql.DB) map[string]bool {
 	return values
 }
 
-func dbExecuteMany(db *sql.DB, commands ...queryCommand) rxgo.Observable {
+func dbExecuteMany(commands ...queryCommand) rxgo.Observable {
 	var pub = make(chan rxgo.Item)
 	go func() {
 		for _, command := range commands {
-			res, err := dbExecute(db, command)
+			res, err := dbExecute(command)
 			pub <- rxgo.Item{V: res, E: err}
 		}
 		close(pub)

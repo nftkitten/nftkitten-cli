@@ -10,8 +10,6 @@ package me
 // )
 
 // func subscribeToken(
-// 	pool *[]rxgo.Disposed,
-// 	db *sql.DB,
 // 	url string,
 // 	// walletAddressesPub chan rxgo.Item,
 // 	filter func(string) bool,
@@ -24,8 +22,7 @@ package me
 // 		if filter(scanId) {
 // 			ob = fetchOne(url, fmt.Sprint("tokens/", mintAddress)).Map(func(_ context.Context, item interface{}) (interface{}, error) {
 // 				bytes, _ := json.Marshal(item)
-// 				*pool = append(*pool, dbExecuteMany(
-// 					db,
+// 				pool = append(pool, dbExecuteMany(
 // 					sqlForUpsert("token", "", mintAddress, bytes),
 // 					sqlForUpsertScanLog(scanId),
 // 				).ForEach(doNothingOnNext, logError, doNothing))
@@ -34,30 +31,28 @@ package me
 // 		} else {
 // 			ob = rxgo.Just(item)()
 // 		}
-// 		*pool = append(*pool, ob.
+// 		pool = append(pool, ob.
 // 			ForEach(func(i interface{}) {
-// 				*pool = append(*pool, fetchMany(url, fmt.Sprint("tokens/", mintAddress, "/listings"), 0).
-// 					ForEach(subscribeTokenListing(pool, mintAddress, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-// 				*pool = append(*pool, fetchMany(
+// 				pool = append(pool, fetchMany(url, fmt.Sprint("tokens/", mintAddress, "/listings"), 0).
+// 					ForEach(subscribeTokenListing(mintAddress, filter), logError, doNothing, rxgo.WithCPUPool()))
+// 				pool = append(pool, fetchMany(
 // 					url,
 // 					fmt.Sprint("tokens/", mintAddress, "/offer_received"),
 // 					500,
 // 				).
-// 					ForEach(subscribeTokenOfferReceived(pool, mintAddress, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-// 				*pool = append(*pool, fetchMany(
+// 					ForEach(subscribeTokenOfferReceived(mintAddress, filter), logError, doNothing, rxgo.WithCPUPool()))
+// 				pool = append(pool, fetchMany(
 // 					url,
 // 					fmt.Sprint("tokens/", mintAddress, "/activities"),
 // 					500,
 // 				).
-// 					ForEach(subscribeTokenActivites(pool, mintAddress, db, filter), logError, doNothing, rxgo.WithCPUPool()))
+// 					ForEach(subscribeTokenActivites(mintAddress, filter), logError, doNothing, rxgo.WithCPUPool()))
 // 			}, logError, doNothing, rxgo.WithCPUPool()))
 // 	}
 // }
 
 // func subscribeTokenListing(
-// 	pool *[]rxgo.Disposed,
 // 	mintAddress string,
-// 	db *sql.DB,
 // 	filter func(string) bool,
 // ) func(interface{}) {
 // 	return func(item interface{}) {
@@ -66,8 +61,7 @@ package me
 // 		pdaAddress := fmt.Sprint(m["pdaAddress"])
 // 		scanId := fmt.Sprint("token_listing.", mintAddress, ".", pdaAddress)
 // 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
+// 			pool = append(pool, dbExecuteMany(
 // 				sqlForUpsertWithParent(
 // 					"token",
 // 					"listing",
@@ -82,9 +76,7 @@ package me
 // }
 
 // func subscribeTokenOfferReceived(
-// 	pool *[]rxgo.Disposed,
 // 	mintAddress string,
-// 	db *sql.DB,
 // 	filter func(string) bool,
 // ) func(interface{}) {
 // 	return func(item interface{}) {
@@ -93,8 +85,7 @@ package me
 // 		pdaAddress := fmt.Sprint(m["pdaAddress"])
 // 		scanId := fmt.Sprint("token_offer_received.", mintAddress, ".", pdaAddress)
 // 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
+// 			pool = append(pool, dbExecuteMany(
 // 				sqlForUpsertWithParent(
 // 					"token",
 // 					"offer_received",
@@ -109,9 +100,7 @@ package me
 // }
 
 // func subscribeTokenActivites(
-// 	pool *[]rxgo.Disposed,
 // 	mintAddress string,
-// 	db *sql.DB,
 // 	filter func(string) bool,
 // ) func(interface{}) {
 // 	return func(item interface{}) {
@@ -120,8 +109,7 @@ package me
 // 		signature := fmt.Sprint(m["signature"])
 // 		scanId := fmt.Sprint("token_activity.", mintAddress, ".", signature)
 // 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
+// 			pool = append(pool, dbExecuteMany(
 // 				sqlForUpsertWithParent(
 // 					"token",
 // 					"activity",
