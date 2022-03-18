@@ -12,7 +12,7 @@ func subscribeCollection(
 	pool *[]rxgo.Disposed,
 	db *sql.DB,
 	url string,
-	tokenMintsPub chan rxgo.Item,
+	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
 	filter func(string) bool,
 ) func(item interface{}) {
@@ -30,10 +30,10 @@ func subscribeCollection(
 		}
 		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/listings"), 20).
 			// ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-			ForEach(subscribeCollectionListing(pool, symbol, db, tokenMintsPub, filter), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionListing(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
 		*pool = append(*pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/activities"), 500).
 			// ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub, walletAddressesPub, rxgo.WithCPUPool()), logError, doNothing, rxgo.WithCPUPool()))
-			ForEach(subscribeCollectionActivity(pool, symbol, db, tokenMintsPub, filter), logError, doNothing, rxgo.WithCPUPool()))
+			ForEach(subscribeCollectionActivity(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
 		*pool = append(*pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
 			ForEach(subscribeCollectionStat(pool, symbol, db, filter), logError, doNothing, rxgo.WithCPUPool()))
 	}
@@ -43,7 +43,7 @@ func subscribeCollectionListing(
 	pool *[]rxgo.Disposed,
 	symbol string,
 	db *sql.DB,
-	tokenMintsPub chan rxgo.Item,
+	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
 	filter func(string) bool,
 ) func(interface{}) {
@@ -63,9 +63,9 @@ func subscribeCollectionListing(
 				sqlForUpsertScanLog(scanId),
 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		}
-		if fmt.Sprint(m["tokenMint"]) != "" {
-			tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
-		}
+		// if fmt.Sprint(m["tokenMint"]) != "" {
+		// 	tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
+		// }
 		// if fmt.Sprint(m["seller"]) != "" {
 		// 	walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["seller"])}
 		// }
@@ -76,7 +76,7 @@ func subscribeCollectionActivity(
 	pool *[]rxgo.Disposed,
 	symbol string,
 	db *sql.DB,
-	tokenMintsPub chan rxgo.Item,
+	// tokenMintsPub chan rxgo.Item,
 	// walletAddressesPub chan rxgo.Item,
 	filter func(string) bool,
 ) func(interface{}) {
@@ -98,9 +98,9 @@ func subscribeCollectionActivity(
 				sqlForUpsertScanLog(scanId),
 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		}
-		if fmt.Sprint(m["tokenMint"]) != "" {
-			tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
-		}
+		// if fmt.Sprint(m["tokenMint"]) != "" {
+		// 	tokenMintsPub <- rxgo.Item{V: fmt.Sprint(m["tokenMint"])}
+		// }
 		// if fmt.Sprint(m["buyer"]) != "" {
 		// 	walletAddressesPub <- rxgo.Item{V: fmt.Sprint(m["buyer"])}
 		// }

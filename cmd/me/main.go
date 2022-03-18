@@ -54,8 +54,8 @@ func execute(db *sql.DB, force bool) {
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_activity
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_made
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_wallet_offers_received`, db)
-	tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
-UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing`, db)
+	// 	tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
+	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing`, db)
 
 	// walletSet := dbQueryIdSet(`SELECT DISTINCT wallet_id AS id FROM me_wallet_token
 	// UNION SELECT DISTINCT CAST(data->'buyer' AS text) AS id FROM me_collection_activity
@@ -70,7 +70,7 @@ UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_l
 	fmt.Println(`initialize streams`)
 	launchpadPub := make(chan rxgo.Item)
 	collectionPub := make(chan rxgo.Item)
-	tokenMintsPub := make(chan rxgo.Item)
+	// tokenMintsPub := make(chan rxgo.Item)
 	// walletAddressesPub := make(chan rxgo.Item)
 	var pool []rxgo.Disposed
 
@@ -80,22 +80,22 @@ UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_l
 	// pool = append(pool, rxgo.FromChannel(walletAddressesPub).
 	// 	Distinct(distinctByValue).
 	// 	ForEach(subscribeWallet(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
-	pool = append(pool, rxgo.FromChannel(tokenMintsPub).
-		Distinct(distinctByValue).
-		// ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeToken(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+	// pool = append(pool, rxgo.FromChannel(tokenMintsPub).
+	// 	Distinct(distinctByValue).
+	// 	// ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
+	// 	ForEach(subscribeToken(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
 		// ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 
 	fmt.Println(`produce events`)
 	go func() {
 		fetchMany(url, "launchpad/collections", 500).Send(launchpadPub)
 		fetchMany(url, "collections", 500).Send(collectionPub)
 
-		for id := range tokenSet {
-			tokenMintsPub <- rxgo.Item{V: id}
-		}
+		// for id := range tokenSet {
+		// 	tokenMintsPub <- rxgo.Item{V: id}
+		// }
 
 		// for id := range walletSet {
 		// 	walletAddressesPub <- rxgo.Item{V: id}
