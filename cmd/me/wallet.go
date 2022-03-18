@@ -33,16 +33,16 @@ func subscribeWallet(
 			ForEach(func(i interface{}) {
 				*pool = append(*pool, fetchMany(url, fmt.Sprint("wallets/", address, "/tokens"), 500).
 					ForEach(subscribeWalletTokens(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-				// *pool = append(*pool, fetchMany(
-				// 	url,
-				// 	fmt.Sprint("wallets/", address, "/activities"),
-				// 	500,
-				// ).
-				// 	ForEach(subscribeWalletActivites(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-				// *pool = append(*pool, fetchMany(url, fmt.Sprint("wallets/", address, "/offers_made"), 500).
-				// 	ForEach(subscribeWalletOffersMade(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
-				// *pool = append(*pool, fetchMany(url, fmt.Sprint("wallets/", address, "/offers_received"), 500).
-				// 	ForEach(subscribeWalletOffersReceived(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
+				*pool = append(*pool, fetchMany(
+					url,
+					fmt.Sprint("wallets/", address, "/activities"),
+					500,
+				).
+					ForEach(subscribeWalletActivites(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
+				*pool = append(*pool, fetchMany(url, fmt.Sprint("wallets/", address, "/offers_made"), 500).
+					ForEach(subscribeWalletOffersMade(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
+				*pool = append(*pool, fetchMany(url, fmt.Sprint("wallets/", address, "/offers_received"), 500).
+					ForEach(subscribeWalletOffersReceived(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
 				*pool = append(*pool, fetchOne(url, fmt.Sprint("wallets/", address, "/escrow_balance")).
 					ForEach(subscribeWalletEscrowBalance(pool, address, db, filter), logError, doNothing, rxgo.WithCPUPool()))
 			}, logError, doNothing, rxgo.WithCPUPool()))
@@ -76,80 +76,80 @@ func subscribeWalletTokens(
 	}
 }
 
-// func subscribeWalletActivites(
-// 	pool *[]rxgo.Disposed,
-// 	address string,
-// 	db *sql.DB,
-// 	filter func(string) bool,
-// ) func(interface{}) {
-// 	return func(item interface{}) {
-// 		m := item.(map[string]interface{})
-// 		bytes, _ := json.Marshal(item)
-// 		signature := fmt.Sprint(m["signature"])
-// 		scanId := fmt.Sprint("wallet_activity.", address, ".", signature)
-// 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
-// 				sqlForUpsertWithParent(
-// 					"wallet",
-// 					"activity",
-// 					address, bytes, signature,
-// 				),
-// 				sqlForUpsertScanLog(scanId),
-// 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
-// 		}
-// 	}
-// }
+func subscribeWalletActivites(
+	pool *[]rxgo.Disposed,
+	address string,
+	db *sql.DB,
+	filter func(string) bool,
+) func(interface{}) {
+	return func(item interface{}) {
+		m := item.(map[string]interface{})
+		bytes, _ := json.Marshal(item)
+		signature := fmt.Sprint(m["signature"])
+		scanId := fmt.Sprint("wallet_activity.", address, ".", signature)
+		if filter(scanId) {
+			*pool = append(*pool, dbExecuteMany(
+				db,
+				sqlForUpsertWithParent(
+					"wallet",
+					"activity",
+					address, bytes, signature,
+				),
+				sqlForUpsertScanLog(scanId),
+			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
+		}
+	}
+}
 
-// func subscribeWalletOffersMade(
-// 	pool *[]rxgo.Disposed,
-// 	address string,
-// 	db *sql.DB,
-// 	filter func(string) bool,
-// ) func(interface{}) {
-// 	return func(item interface{}) {
-// 		m := item.(map[string]interface{})
-// 		bytes, _ := json.Marshal(item)
-// 		pdaAddress := fmt.Sprint(m["pdaAddress"])
-// 		scanId := fmt.Sprint("wallet_offers_made.", address, ".", pdaAddress)
-// 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
-// 				sqlForUpsertWithParent(
-// 					"wallet",
-// 					"offers_made",
-// 					address, bytes, pdaAddress,
-// 				),
-// 				sqlForUpsertScanLog(scanId),
-// 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
-// 		}
-// 	}
-// }
+func subscribeWalletOffersMade(
+	pool *[]rxgo.Disposed,
+	address string,
+	db *sql.DB,
+	filter func(string) bool,
+) func(interface{}) {
+	return func(item interface{}) {
+		m := item.(map[string]interface{})
+		bytes, _ := json.Marshal(item)
+		pdaAddress := fmt.Sprint(m["pdaAddress"])
+		scanId := fmt.Sprint("wallet_offers_made.", address, ".", pdaAddress)
+		if filter(scanId) {
+			*pool = append(*pool, dbExecuteMany(
+				db,
+				sqlForUpsertWithParent(
+					"wallet",
+					"offers_made",
+					address, bytes, pdaAddress,
+				),
+				sqlForUpsertScanLog(scanId),
+			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
+		}
+	}
+}
 
-// func subscribeWalletOffersReceived(
-// 	pool *[]rxgo.Disposed,
-// 	address string,
-// 	db *sql.DB,
-// 	filter func(string) bool,
-// ) func(interface{}) {
-// 	return func(item interface{}) {
-// 		m := item.(map[string]interface{})
-// 		bytes, _ := json.Marshal(item)
-// 		pdaAddress := fmt.Sprint(m["pdaAddress"])
-// 		scanId := fmt.Sprint("wallet_offers_received.", address, ".", pdaAddress)
-// 		if filter(scanId) {
-// 			*pool = append(*pool, dbExecuteMany(
-// 				db,
-// 				sqlForUpsertWithParent(
-// 					"wallet",
-// 					"offers_received",
-// 					address, bytes, pdaAddress,
-// 				),
-// 				sqlForUpsertScanLog(scanId),
-// 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
-// 		}
-// 	}
-// }
+func subscribeWalletOffersReceived(
+	pool *[]rxgo.Disposed,
+	address string,
+	db *sql.DB,
+	filter func(string) bool,
+) func(interface{}) {
+	return func(item interface{}) {
+		m := item.(map[string]interface{})
+		bytes, _ := json.Marshal(item)
+		pdaAddress := fmt.Sprint(m["pdaAddress"])
+		scanId := fmt.Sprint("wallet_offers_received.", address, ".", pdaAddress)
+		if filter(scanId) {
+			*pool = append(*pool, dbExecuteMany(
+				db,
+				sqlForUpsertWithParent(
+					"wallet",
+					"offers_received",ssszz
+					address, bytes, pdaAddress,
+				),
+				sqlForUpsertScanLog(scanId),
+			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
+		}
+	}
+}
 
 func subscribeWalletEscrowBalance(
 	pool *[]rxgo.Disposed,
