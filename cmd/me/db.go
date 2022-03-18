@@ -23,11 +23,11 @@ DO UPDATE SET data=$2::jsonb,updated_at=now()`),
 		values: values,
 	}
 }
-func sqlForUpsertScanLog(obj string, values ...interface{}) queryCommand {
+func sqlForUpsertScanLog(scanId string) queryCommand {
 	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES(CONCAT('`, obj, `.',$1::text),now())
+		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES($1::text,now())
 ON CONFLICT(id) DO UPDATE SET scanned_at=now()`),
-		values: values,
+		values: []interface{}{scanId},
 	}
 }
 

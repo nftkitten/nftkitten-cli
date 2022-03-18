@@ -76,20 +76,17 @@ UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_l
 
 	fmt.Println(`observe streams`)
 	pool = append(pool, rxgo.FromChannel(launchpadPub).
-		ForEach(subscribeLaunchpad(db), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeLaunchpad(&pool, db, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	// pool = append(pool, rxgo.FromChannel(walletAddressesPub).
-	// 	Filter(filterWallet(force, scanned)).
 	// 	Distinct(distinctByValue).
 	// 	ForEach(subscribeWallet(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(tokenMintsPub).
-		Filter(filterToken(force, scanned)).
 		Distinct(distinctByValue).
 		// ForEach(subscribeToken(&pool, db, url, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeToken(&pool, db, url), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeToken(&pool, db, url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
-		Filter(filterCollection(force, scanned)).
 		// ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeCollection(&pool, db, url, tokenMintsPub), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(&pool, db, url, tokenMintsPub, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 
 	fmt.Println(`produce events`)
 	go func() {

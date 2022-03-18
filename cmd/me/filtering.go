@@ -24,6 +24,20 @@ func filterCollection(
 	}
 }
 
+func filterScanned(
+	force bool,
+	scanned map[string]bool,
+) func(string) bool {
+	return func(id string) bool {
+		if !force {
+			if _, ok := scanned[id]; ok {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 func filterToken(
 	force bool,
 	scannedIn24Hours map[string]bool,
