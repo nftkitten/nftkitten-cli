@@ -22,23 +22,43 @@ var Cmd = &cobra.Command{
 	Short: "crawl ME API",
 	Run: func(cmd *cobra.Command, args []string) {
 		force, _ := cmd.Flags().GetBool("force")
+		API_BASE_URL, ok := os.LookupEnv("API_BASE_URL")
+		if !ok {
+			log.Fatalln("No API_BASE_URL")
+		}
+		PGUSER, ok := os.LookupEnv("PGUSER")
+		if !ok {
+			log.Fatalln("No PGUSER")
+		}
+		PGPASSWORD, ok := os.LookupEnv("PGPASSWORD")
+		if !ok {
+			log.Fatalln("No PGPASSWORD")
+		}
+		PGHOST, ok := os.LookupEnv("PGHOST")
+		if !ok {
+			log.Fatalln("No PGHOST")
+		}
+		PGDATABASE, ok := os.LookupEnv("PGDATABASE")
+		if !ok {
+			log.Fatalln("No PGDATABASE")
+		}
 		connStr := fmt.Sprint(
 			"postgres://",
-			os.Getenv("PGUSER"),
+			PGUSER,
 			":",
-			os.Getenv("PGPASSWORD"),
+			PGPASSWORD,
 			"@",
-			os.Getenv("PGHOST"),
+			PGHOST,
 			"/",
-			os.Getenv("PGDATABASE"),
+			PGDATABASE,
 			"?sslmode=disable",
 		)
 		var err error
 		db, err = sql.Open("postgres", connStr)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalln(err)
 		}
-		execute(force)
+		execute(API_BASE_URL, force)
 		db.Close()
 		db = nil
 	},
@@ -48,11 +68,9 @@ func init() {
 	Cmd.Flags().Bool("force", false, "Rescan new content")
 }
 
-func execute(force bool) {
-	url := os.Getenv("API_BASE_URL")
-	fmt.Println(url)
-
-	fmt.Println(`initialize lookups`)
+func execute(apiBaseUrl string, force bool) {
+	log.Println(apiBaseUrl)
+	log.Println(`initialize lookups`)
 	scanned := dbQueryScanLog()
 
 	// tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
@@ -74,13 +92,13 @@ func execute(force bool) {
 	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_offer_received
 	// UNION SELECT DISTINCT CAST(data->'seller' AS text) AS id FROM me_token_activity`)
 
-	fmt.Println(`initialize streams`)
+	log.Println(`initialize streams`)
 	launchpadPub := make(chan rxgo.Item)
 	collectionPub := make(chan rxgo.Item)
 	// tokenMintsPub := make(chan rxgo.Item)
 	// walletAddressesPub := make(chan rxgo.Item)
 
-	fmt.Println(`observe streams`)
+	log.Println(`observe streams`)
 	pool = append(pool, rxgo.FromChannel(launchpadPub).
 		ForEach(subscribeLaunchpad(filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	// pool = append(pool, rxgo.FromChannel(walletAddressesPub).
@@ -92,12 +110,12 @@ func execute(force bool) {
 	// 	ForEach(subscribeToken(url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
 		// ForEach(subscribeCollection(url, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
-		ForEach(subscribeCollection(url, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(apiBaseUrl, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
 
-	fmt.Println(`produce events`)
+	log.Println(`produce events`)
 	go func() {
-		fetchMany(url, "launchpad/collections", 500).Send(launchpadPub)
-		fetchMany(url, "collections", 500).Send(collectionPub)
+		fetchMany(apiBaseUrl, "launchpad/collections", 500).Send(launchpadPub)
+		fetchMany(apiBaseUrl, "collections", 500).Send(collectionPub)
 
 		// for id := range tokenSet {
 		// 	tokenMintsPub <- rxgo.Item{V: id}
