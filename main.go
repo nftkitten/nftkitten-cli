@@ -12,7 +12,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalln("Error loading .env file")
 	}
 
 	var rootCmd = &cobra.Command{Use: "app"}
