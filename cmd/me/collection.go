@@ -18,12 +18,10 @@ func subscribeCollection(
 		bytes, _ := json.Marshal(item)
 		symbol := fmt.Sprint(m["symbol"])
 		scanId := fmt.Sprint("collection.", symbol)
-		if filter(scanId) {
-			pool = append(pool, dbExecuteMany(
-				sqlForUpsert("collection", "", symbol, bytes),
-				sqlForUpsertScanLog(scanId),
-			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
-		}
+		pool = append(pool, dbExecuteMany(
+			sqlForUpsert("collection", "", symbol, bytes),
+			sqlForUpsertScanLog(scanId),
+		).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		pool = append(pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/listings"), 20).
 			// ForEach(subscribeCollectionListing(symbol, tokenMintsPub, walletAddressesPub), logError, doNothing, rxgo.WithCPUPool()))
 			ForEach(subscribeCollectionListing(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
