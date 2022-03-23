@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/joho/godotenv"
 	"github.com/nftkitten/nftkitten-cli/cmd/me"
@@ -10,9 +11,12 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalln("Error loading .env file")
+	env := os.Getenv("NK_ENV")
+	if "" == env {
+		godotenv.Load()
+	} else {
+		log.Println("Loading .env." + env + ".local")
+		godotenv.Load(".env." + env + ".local")
 	}
 
 	var rootCmd = &cobra.Command{Use: "app"}
