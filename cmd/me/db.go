@@ -7,10 +7,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/reactivex/rxgo/v2"
-	"go.uber.org/ratelimit"
+	"github.com/tidwall/limiter"
 )
 
-var dbRateLimit ratelimit.Limiter = ratelimit.New(10) // per second
+var concurrentlimiter = limiter.New(20)
 
 func sqlForUpsertLaunchpad(
 	obj string,
@@ -48,8 +48,13 @@ func printCommand(command queryCommand) {
 }
 
 func dbExecute(command queryCommand) (sql.Result, error) {
-	dbRateLimit.Take()
-	color.New(color.FgYellow).Println(command.text)
+	concurrentlimiter.Begin()
+	defer concurrentlimiter.End()
+	if len(command.text) > 50 {
+		color.New(color.FgYellow).Println(command.text[:50] + "...")
+	} else {
+		color.New(color.FgYellow).Println(command.text + "...")
+	}
 	args := command.values
 	stmt, err := db.Prepare(command.text)
 
@@ -66,8 +71,13 @@ func dbExecute(command queryCommand) (sql.Result, error) {
 }
 
 func dbQuery(text string) ([]map[string]interface{}, error) {
-	dbRateLimit.Take()
-	color.New(color.FgYellow).Println(text)
+	concurrentlimiter.Begin()
+	defer concurrentlimiter.End()
+	if len(text) > 50 {
+		color.New(color.FgYellow).Println(text[:50] + "...")
+	} else {
+		color.New(color.FgYellow).Println(text + "...")
+	}
 	rows, err := db.Query(text)
 	if err != nil {
 		return nil, err

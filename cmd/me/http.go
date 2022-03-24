@@ -12,6 +12,7 @@ import (
 )
 
 var httpRateLimit ratelimit.Limiter = ratelimit.New(2) // per second
+var UNLIMIT_PAGE = 0
 
 func httpFetch(url string) (interface{}, error) {
 	httpRateLimit.Take()
@@ -40,13 +41,16 @@ func fetchOne(url string, endpoint string) rxgo.Observable {
 	return rxgo.FromChannel(pub)
 }
 
-func fetchMany(url string, endpoint string, batchSize int) rxgo.Observable {
+func fetchMany(url string, endpoint string, batchSize int, maxPage int) rxgo.Observable {
 	pub := make(chan rxgo.Item)
-	go fetchManyRecursive(url, endpoint, batchSize, 0, pub)
+	go fetchManyRecursive(url, endpoint, batchSize, 0, maxPage, pub)
 	return rxgo.FromChannel(pub)
 }
 
-func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, pub chan rxgo.Item) {
+func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, maxPage int, pub chan rxgo.Item) {
+	if maxPage != UNLIMIT_PAGE && (1+offset/batchSize) > maxPage {
+		return
+	}
 	if batchSize != 0 {
 		log.Println(fmt.Sprint("query: ", endpoint, " #", (1 + offset/batchSize)))
 	} else {
@@ -78,7 +82,7 @@ func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, 
 	for _, d := range data {
 		pub <- rxgo.Item{V: d}
 	}
-	fetchManyRecursive(url, endpoint, batchSize, offset+batchSize, pub)
+	fetchManyRecursive(url, endpoint, batchSize, offset+batchSize, maxPage, pub)
 }
 
 func fetchFromApi(url string, defVal interface{}) (interface{}, error) {

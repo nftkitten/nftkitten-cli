@@ -21,7 +21,7 @@ var Cmd = &cobra.Command{
 	Use:   "me",
 	Short: "crawl ME API",
 	Run: func(cmd *cobra.Command, args []string) {
-		force, _ := cmd.Flags().GetBool("force")
+		full, _ := cmd.Flags().GetBool("full")
 		API_BASE_URL, ok := os.LookupEnv("API_BASE_URL")
 		if !ok {
 			log.Fatalln("No API_BASE_URL")
@@ -58,20 +58,19 @@ var Cmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		execute(API_BASE_URL, force)
+		execute(API_BASE_URL, full)
 		db.Close()
 		db = nil
 	},
 }
 
 func init() {
-	Cmd.Flags().Bool("force", false, "Rescan new content")
+	Cmd.Flags().Bool("full", false, "Rescan new content")
 }
 
-func execute(apiBaseUrl string, force bool) {
+func execute(apiBaseUrl string, full bool) {
 	log.Println(apiBaseUrl)
 	log.Println(`initialize lookups`)
-	scanned := make(map[string]bool)
 
 	log.Println(`initialize streams`)
 	launchpadPub := make(chan rxgo.Item)
@@ -79,14 +78,18 @@ func execute(apiBaseUrl string, force bool) {
 
 	log.Println(`observe streams`)
 	pool = append(pool, rxgo.FromChannel(launchpadPub).
-		ForEach(subscribeLaunchpad(filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeLaunchpad(), logError, doNothing, rxgo.WithCPUPool()))
 	pool = append(pool, rxgo.FromChannel(collectionPub).
-		ForEach(subscribeCollection(apiBaseUrl, filterScanned(force, scanned)), logError, doNothing, rxgo.WithCPUPool()))
+		ForEach(subscribeCollection(apiBaseUrl), logError, doNothing, rxgo.WithCPUPool()))
 
 	log.Println(`produce events`)
+	pageLimit := 10
+	if full {
+		pageLimit = UNLIMIT_PAGE
+	}
 	go func() {
-		fetchMany(apiBaseUrl, "launchpad/collections", 500).Send(launchpadPub)
-		fetchMany(apiBaseUrl, "collections", 500).Send(collectionPub)
+		fetchMany(apiBaseUrl, "launchpad/collections", 500, pageLimit).Send(launchpadPub)
+		fetchMany(apiBaseUrl, "collections", 500, pageLimit).Send(collectionPub)
 	}()
 
 	log.Println("wait.")
