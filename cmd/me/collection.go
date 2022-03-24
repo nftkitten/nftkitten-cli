@@ -15,8 +15,11 @@ func subscribeCollection(
 ) func(item interface{}) {
 	return func(item interface{}) {
 		m := item.(map[string]interface{})
-		bytes, _ := json.Marshal(item)
 		symbol := fmt.Sprint(m["symbol"])
+		<-fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).ForEach(func(stats interface{}) {
+			m["stats"] = stats
+		}, logError, doNothing)
+		bytes, _ := json.Marshal(item)
 		// scanId := fmt.Sprint("collection.", symbol)
 		pool = append(pool, dbExecuteMany(
 			sqlForUpsert("collection", "", symbol, bytes),
@@ -28,8 +31,8 @@ func subscribeCollection(
 		// pool = append(pool, fetchMany(url, fmt.Sprint("collections/", symbol, "/activities"), 500).
 		// 	// ForEach(subscribeCollectionActivity(symbol, tokenMintsPub, walletAddressesPub, rxgo.WithCPUPool()), logError, doNothing, rxgo.WithCPUPool()))
 		// 	ForEach(subscribeCollectionActivity(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
-		pool = append(pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
-			ForEach(subscribeCollectionStat(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
+		// pool = append(pool, fetchOne(url, fmt.Sprint("collections/", symbol, "/stats")).
+		// 	ForEach(subscribeCollectionStat(symbol, filter), logError, doNothing, rxgo.WithCPUPool()))
 	}
 }
 
@@ -98,23 +101,23 @@ func subscribeCollection(
 // 	}
 // }
 
-func subscribeCollectionStat(
-	symbol string,
-	filter func(string) bool,
-) func(interface{}) {
-	return func(item interface{}) {
-		bytes, _ := json.Marshal(item)
-		scanId := fmt.Sprint("collection_stat.", symbol)
-		if filter(scanId) {
-			pool = append(pool, dbExecuteMany(
-				sqlForUpsert(
-					"collection_stat",
-					"collection_",
-					symbol,
-					bytes,
-				),
-				// sqlForUpsertScanLog(scanId),
-			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
-		}
-	}
-}
+// func subscribeCollectionStat(
+// 	symbol string,
+// 	filter func(string) bool,
+// ) func(interface{}) {
+// 	return func(item interface{}) {
+// 		bytes, _ := json.Marshal(item)
+// 		scanId := fmt.Sprint("collection_stat.", symbol)
+// 		if filter(scanId) {
+// 			pool = append(pool, dbExecuteMany(
+// 				sqlForUpdate(
+// 					"collection_stat",
+// 					"collection_",
+// 					symbol,
+// 					bytes,
+// 				),
+// 				// sqlForUpsertScanLog(scanId),
+// 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
+// 		}
+// 	}
+// }

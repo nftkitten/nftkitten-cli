@@ -1,0 +1,106 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "172.31.11.253",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "tec_admin@prd-marketing-website",
+            "group": "marketing-website",
+            "database": "tec_wordpress",
+            "username": "tec_admin",
+            "password": "23qGy4vKCq1JR4n74WkrWt0TJjuKo"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "uat-etg-wordpress-staging-rds.c2iq32llyzgr.ap-southeast-1.rds.amazonaws.com",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "uat_uvs@uat-etg-wordpress-staging-rds.c2iq32llyzgr.ap-southeast-1.rds.amazonaws.com",
+            "group": "marketing-website",
+            "database": "uat_tec_wordpress",
+            "username": "uat_uvs",
+            "password": "uat_uvs_03&"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "etg-command-mysql-website-subdir-rds.c2iq32llyzgr.ap-southeast-1.rds.amazonaws.com",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "uvs@etg-command-mysql-website-subdir-rds",
+            "group": "marketing-website",
+            "database": "tec_wordpress",
+            "username": "uvs",
+            "password": "uvs_37%"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "uat-marketing-website.c2iq32llyzgr.ap-southeast-1.rds.amazonaws.com",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "tec_admin@uat-marketing-website.c2iq32llyzgr.ap-southeast-1.rds.amazonaws.com",
+            "group": "marketing-website",
+            "database": "tec_wordpress",
+            "username": "tec_admin",
+            "password": "RI4ZeGgtK67Zpf3ee4q2"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "root@localhost",
+            "database": "tec_wordpress",
+            "username": "root",
+            "password": "wordpress",
+            "group": "marketing-website"
+        },
+        {
+            "mssqlOptions": {
+                "appName": "SQLTools",
+                "useUTC": true,
+                "encrypt": true
+            },
+            "previewLimit": 50,
+            "server": "172.31.2.251",
+            "port": 1433,
+            "driver": "MSSQL",
+            "name": "core@tectac-db.corp-uat",
+            "group": "tectac",
+            "database": "TecTac",
+            "username": "remote-access",
+            "password": "$M3p68^80UN5#dai4eO@5tl&KlWpeF^iq92IT1iJ"
+        },
+        {
+            "pgOptions": {
+                "ssl": {
+                    "rejectUnauthorized": false
+                }
+            },
+            "previewLimit": 50,
+            "server": "ec2-54-224-64-114.compute-1.amazonaws.com",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "username": "mncriaryrtypbi",
+            "password": "57d70c6e8a82c1d200d6b3f80c65a991e4c8bf83a7b7cdb0872132ae2b108348",
+            "database": "dar0bs76266at5",
+            "group": "nftkitten",
+            "name": "heroku"
+        }
+    ]
+}

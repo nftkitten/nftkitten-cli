@@ -24,6 +24,19 @@ DO UPDATE SET data=$2::jsonb,updated_at=now()`),
 	}
 }
 
+func sqlForUpdate(
+	obj string,
+	id_prefix string,
+	field string,
+	values ...interface{},
+) queryCommand {
+	return queryCommand{
+		text: fmt.Sprint(`UPDATE me_`, obj, ` SET data = jsonb_set(data, '{`, field, `}, $2::jsonb),updated_at=now()
+WHERE id=$1::text`),
+		values: values,
+	}
+}
+
 // func sqlForUpsertScanLog(scanId string) queryCommand {
 // 	return queryCommand{
 // 		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES($1::text,now())
