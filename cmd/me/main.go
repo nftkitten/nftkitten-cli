@@ -51,7 +51,7 @@ var Cmd = &cobra.Command{
 			PGHOST,
 			"/",
 			PGDATABASE,
-			"?sslmode=disable",
+			"?sslmode=require",
 		)
 		var err error
 		db, err = sql.Open("postgres", connStr)
@@ -71,7 +71,8 @@ func init() {
 func execute(apiBaseUrl string, force bool) {
 	log.Println(apiBaseUrl)
 	log.Println(`initialize lookups`)
-	scanned := dbQueryScanLog()
+	// scanned := dbQueryScanLog()
+	scanned := make(map[string]bool)
 
 	// tokenSet := dbQueryIdSet(`SELECT DISTINCT id FROM me_token
 	// UNION SELECT DISTINCT CAST(data->'tokenMint' AS text) AS id FROM me_collection_listing

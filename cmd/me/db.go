@@ -23,13 +23,14 @@ DO UPDATE SET data=$2::jsonb,updated_at=now()`),
 		values: values,
 	}
 }
-func sqlForUpsertScanLog(scanId string) queryCommand {
-	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES($1::text,now())
-ON CONFLICT(id) DO UPDATE SET scanned_at=now()`),
-		values: []interface{}{scanId},
-	}
-}
+
+// func sqlForUpsertScanLog(scanId string) queryCommand {
+// 	return queryCommand{
+// 		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES($1::text,now())
+// ON CONFLICT(id) DO UPDATE SET scanned_at=now()`),
+// 		values: []interface{}{scanId},
+// 	}
+// }
 
 func sqlForUpsertWithParent(
 	parent string,
@@ -145,18 +146,18 @@ func dbQuery(text string) ([]map[string]interface{}, error) {
 	return results, nil
 }
 
-func dbQueryScanLog() map[string]bool {
-	cmd := `SELECT id FROM me_scan_log`
-	rows, err := dbQuery(cmd)
-	if err != nil {
-		panic(err)
-	}
-	res := make(map[string]bool)
-	for _, row := range rows {
-		res[fmt.Sprint(row["id"])] = true
-	}
-	return res
-}
+// func dbQueryScanLog() map[string]bool {
+// 	cmd := `SELECT id FROM me_scan_log`
+// 	rows, err := dbQuery(cmd)
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	res := make(map[string]bool)
+// 	for _, row := range rows {
+// 		res[fmt.Sprint(row["id"])] = true
+// 	}
+// 	return res
+// }
 
 func dbQueryIdSet(text string) map[string]bool {
 	rows, err := dbQuery(text)

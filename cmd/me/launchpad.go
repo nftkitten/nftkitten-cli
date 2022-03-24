@@ -16,7 +16,7 @@ func subscribeLaunchpad(filter func(string) bool) func(interface{}) {
 		if filter(scanId) {
 			pool = append(pool, dbExecuteMany(
 				sqlForUpsert("launchpad", "", symbol, bytes),
-				sqlForUpsertScanLog(scanId),
+				// sqlForUpsertScanLog(scanId),
 			).ForEach(doNothingOnNext, logError, doNothing, rxgo.WithCPUPool()))
 		}
 	}
