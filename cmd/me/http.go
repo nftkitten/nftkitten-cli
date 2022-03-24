@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/fatih/color"
 	"github.com/reactivex/rxgo/v2"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
@@ -14,6 +15,7 @@ var httpRateLimit ratelimit.Limiter = ratelimit.New(2) // per second
 
 func httpFetch(url string) (interface{}, error) {
 	httpRateLimit.Take()
+	color.New(color.FgHiCyan).Println(url)
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 	req.Header.SetMethod("GET")

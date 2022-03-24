@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/fatih/color"
 	"github.com/reactivex/rxgo/v2"
 	"go.uber.org/ratelimit"
 )
 
-var dbRateLimit ratelimit.Limiter = ratelimit.New(5) // per second
+var dbRateLimit ratelimit.Limiter = ratelimit.New(10) // per second
 
 func sqlForUpsertLaunchpad(
 	obj string,
@@ -17,9 +18,9 @@ func sqlForUpsertLaunchpad(
 	values ...interface{},
 ) queryCommand {
 	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data)VALUES($1::text,$2::jsonb)
-ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data
-DO UPDATE SET data=$2::jsonb,updated_at=$3::timestamp`),
+		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data)VALUES($1::text,$2::jsonb)`,
+			`ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data `,
+			`DO UPDATE SET data=$2::jsonb,updated_at=now()`),
 		values: values,
 	}
 }
@@ -30,9 +31,9 @@ func sqlForUpsertCollection(
 	values ...interface{},
 ) queryCommand {
 	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data,stats)VALUES($1::text,$2::jsonb,$3::jsonb)
-ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data
-DO UPDATE SET data=$2::jsonb,updated_at=now()`),
+		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data,stats)VALUES($1::text,$2::jsonb,$3::jsonb)`,
+			`ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data OR stats@>$3::jsonb AND $3::jsonb@>stats `,
+			`DO UPDATE SET data=$2::jsonb,stats=$3::jsonb,updated_at=now()`),
 		values: values,
 	}
 }
@@ -48,6 +49,7 @@ func printCommand(command queryCommand) {
 
 func dbExecute(command queryCommand) (sql.Result, error) {
 	dbRateLimit.Take()
+	color.New(color.FgYellow).Println(command.text)
 	args := command.values
 	stmt, err := db.Prepare(command.text)
 
@@ -65,6 +67,7 @@ func dbExecute(command queryCommand) (sql.Result, error) {
 
 func dbQuery(text string) ([]map[string]interface{}, error) {
 	dbRateLimit.Take()
+	color.New(color.FgYellow).Println(text)
 	rows, err := db.Query(text)
 	if err != nil {
 		return nil, err
