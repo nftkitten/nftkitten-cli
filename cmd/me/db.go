@@ -11,7 +11,7 @@ import (
 
 var dbRateLimit ratelimit.Limiter = ratelimit.New(5) // per second
 
-func sqlForUpsert(
+func sqlForUpsertLaunchpad(
 	obj string,
 	id_prefix string,
 	values ...interface{},
@@ -19,40 +19,19 @@ func sqlForUpsert(
 	return queryCommand{
 		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data)VALUES($1::text,$2::jsonb)
 ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data
-DO UPDATE SET data=$2::jsonb,updated_at=now()`),
+DO UPDATE SET data=$2::jsonb,updated_at=$3::timestamp`),
 		values: values,
 	}
 }
 
-func sqlForUpdate(
+func sqlForUpsertCollection(
 	obj string,
 	id_prefix string,
-	field string,
 	values ...interface{},
 ) queryCommand {
 	return queryCommand{
-		text: fmt.Sprint(`UPDATE me_`, obj, ` SET data = jsonb_set(data, '{`, field, `}, $2::jsonb),updated_at=now()
-WHERE id=$1::text`),
-		values: values,
-	}
-}
-
-// func sqlForUpsertScanLog(scanId string) queryCommand {
-// 	return queryCommand{
-// 		text: fmt.Sprint(`INSERT INTO me_scan_log(id,scanned_at)VALUES($1::text,now())
-// ON CONFLICT(id) DO UPDATE SET scanned_at=now()`),
-// 		values: []interface{}{scanId},
-// 	}
-// }
-
-func sqlForUpsertWithParent(
-	parent string,
-	obj string,
-	values ...interface{},
-) queryCommand {
-	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_`, parent, `_`, obj, `(id,`, parent, `_id,data)VALUES($3::text,$1::text,$2::jsonb)
-ON CONFLICT(`, parent, `_id,id)WHERE data@>$2::jsonb AND $2::jsonb@>data
+		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data,stats)VALUES($1::text,$2::jsonb,$3::jsonb)
+ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data
 DO UPDATE SET data=$2::jsonb,updated_at=now()`),
 		values: values,
 	}
@@ -158,19 +137,6 @@ func dbQuery(text string) ([]map[string]interface{}, error) {
 	}
 	return results, nil
 }
-
-// func dbQueryScanLog() map[string]bool {
-// 	cmd := `SELECT id FROM me_scan_log`
-// 	rows, err := dbQuery(cmd)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-// 	res := make(map[string]bool)
-// 	for _, row := range rows {
-// 		res[fmt.Sprint(row["id"])] = true
-// 	}
-// 	return res
-// }
 
 func dbQueryIdSet(text string) map[string]bool {
 	rows, err := dbQuery(text)
