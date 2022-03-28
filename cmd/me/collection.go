@@ -16,28 +16,28 @@ func subscribeCollection(
 
 		statsCh := make(chan Item)
 		go func() {
-			defer close(statsCh)
 			statsCh <- fetchOne(fmt.Sprint("collections/", symbol, "/stats"))
+			close(statsCh)
 		}()
 
 		listingCh := make(chan Item)
 		go func() {
-			defer close(listingCh)
 			listingCh <- fetchOne(fmt.Sprint("collections/", symbol, "/listings?offset=0&limit=20"))
+			close(listingCh)
 		}()
 
 		activitiesCh := make(chan Item)
 		go func() {
-			defer close(activitiesCh)
 			activitiesCh <- fetchOne(fmt.Sprint("collections/", symbol, "/activities?offset=0&limit=500"))
+			close(activitiesCh)
 		}()
 
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
 			statsItem := <-statsCh
 			if statsItem.E != nil {
 				logError(statsItem.E)
+				wg.Done()
 				return
 			}
 			stats, ok := statsItem.V.(map[string]interface{})
@@ -49,6 +49,7 @@ func subscribeCollection(
 			listingItem := <-listingCh
 			if listingItem.E != nil {
 				logError(listingItem.E)
+				wg.Done()
 				return
 			}
 
@@ -72,6 +73,7 @@ func subscribeCollection(
 			activitiesItem := <-activitiesCh
 			if activitiesItem.E != nil {
 				logError(activitiesItem.E)
+				wg.Done()
 				return
 			}
 			stats["activities"] = activitiesItem.V
@@ -80,12 +82,13 @@ func subscribeCollection(
 
 			wg.Add(1)
 			go func() {
-				defer wg.Done()
 				_, err := dbExecuteMany(sqlForUpsert(table, "", symbol, bytes, statsBytes))
 				if err != nil {
 					logError(err)
 				}
+				wg.Done()
 			}()
+			wg.Done()
 		}()
 	}
 }
