@@ -16,7 +16,12 @@ var UNLIMIT_PAGE = 0
 
 func httpFetch(url string, limit ratelimit.Limiter) (interface{}, error) {
 	limit.Take()
-	color.New(color.FgHiCyan).Println(url)
+	switch limit {
+	case solScanHttpRateLimit:
+		color.New(color.FgHiGreen).Println(url)
+	default:
+		color.New(color.FgHiCyan).Println(url)
+	}
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 	req.Header.SetMethod("GET")
