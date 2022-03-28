@@ -30,18 +30,18 @@ func httpFetch(url string) (interface{}, error) {
 	return output, nil
 }
 
-func fetchOne(url string, endpoint string) Item {
-	val, err := fetchFromApi(fmt.Sprint(url, "/", endpoint), nil)
+func fetchOne(endpoint string) Item {
+	val, err := fetchFromApi(fmt.Sprint(API_BASE_URL, "/", endpoint), nil)
 	return Item{V: val, E: err}
 }
 
-func fetchMany(url string, endpoint string, batchSize int, maxPage int) chan Item {
+func fetchMany(endpoint string, batchSize int, maxPage int) chan Item {
 	ch := make(chan Item)
-	go fetchManyRecursive(url, endpoint, batchSize, 0, maxPage, ch)
+	go fetchManyRecursive(endpoint, batchSize, 0, maxPage, ch)
 	return ch
 }
 
-func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, maxPage int, ch chan Item) {
+func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int, ch chan Item) {
 	if maxPage != UNLIMIT_PAGE && (1+offset/batchSize) > maxPage {
 		return
 	}
@@ -54,12 +54,12 @@ func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, 
 	var err error
 	if batchSize > 0 {
 		res, err = fetchFromApi(
-			fmt.Sprint(url, "/", endpoint, "?offset=", offset, "&limit=", batchSize),
+			fmt.Sprint(API_BASE_URL, "/", endpoint, "?offset=", offset, "&limit=", batchSize),
 			nil,
 		)
 	} else {
 		res, err = fetchFromApi(
-			fmt.Sprint(url, "/", endpoint),
+			fmt.Sprint(API_BASE_URL, "/", endpoint),
 			nil,
 		)
 	}
@@ -76,7 +76,7 @@ func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, 
 	for _, d := range data {
 		ch <- Item{V: d}
 	}
-	fetchManyRecursive(url, endpoint, batchSize, offset+batchSize, maxPage, ch)
+	fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, ch)
 }
 
 func fetchFromApi(url string, defVal interface{}) (interface{}, error) {

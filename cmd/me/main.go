@@ -18,15 +18,22 @@ type Item struct {
 }
 
 var db *sql.DB
+var API_BASE_URL string
+var SOLSCAN_PUBLIC_API_BASE_URL string
 
 var Cmd = &cobra.Command{
 	Use:   "me",
 	Short: "crawl ME API",
 	Run: func(cmd *cobra.Command, args []string) {
 		full, _ := cmd.Flags().GetBool("full")
-		API_BASE_URL, ok := os.LookupEnv("API_BASE_URL")
+		var ok bool
+		API_BASE_URL, ok = os.LookupEnv("API_BASE_URL")
 		if !ok {
 			log.Fatalln("No API_BASE_URL")
+		}
+		SOLSCAN_PUBLIC_API_BASE_URL, ok = os.LookupEnv("SOLSCAN_PUBLIC_API_BASE_URL")
+		if !ok {
+			log.Fatalln("No PUBLIC_SOLSCAN_API_BASE_URL")
 		}
 		PGUSER, ok := os.LookupEnv("PGUSER")
 		if !ok {
@@ -60,7 +67,7 @@ var Cmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		execute(API_BASE_URL, full)
+		execute(full)
 		db.Close()
 		db = nil
 	},
@@ -70,15 +77,16 @@ func init() {
 	Cmd.Flags().Bool("full", false, "Rescan new content")
 }
 
-func execute(apiBaseUrl string, full bool) {
-	log.Println(apiBaseUrl)
+func execute(full bool) {
+	log.Println(API_BASE_URL)
+	log.Println(SOLSCAN_PUBLIC_API_BASE_URL)
 	log.Println(`initialize lookups`)
 
 	log.Println(`initialize streams`)
 	var wg sync.WaitGroup
 
-	subscribeLaunchpad := subscribeCollection("launchpad", apiBaseUrl, wg)
-	subscribeCollection := subscribeCollection("collection", apiBaseUrl, wg)
+	subscribeLaunchpad := subscribeCollection("launchpad", wg)
+	subscribeCollection := subscribeCollection("collection", wg)
 
 	log.Println(`produce events`)
 	pageLimit := 10
@@ -88,7 +96,7 @@ func execute(apiBaseUrl string, full bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for val := range fetchMany(apiBaseUrl, "launchpad/collections", 500, pageLimit) {
+		for val := range fetchMany("launchpad/collections", 500, pageLimit) {
 			if val.E != nil {
 				logError(val.E)
 			} else {
@@ -99,7 +107,7 @@ func execute(apiBaseUrl string, full bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for val := range fetchMany(apiBaseUrl, "collections", 500, pageLimit) {
+		for val := range fetchMany("collections", 500, pageLimit) {
 			if val.E != nil {
 				logError(val.E)
 			} else {
