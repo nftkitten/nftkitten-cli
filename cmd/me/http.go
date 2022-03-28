@@ -10,11 +10,12 @@ import (
 	"go.uber.org/ratelimit"
 )
 
-var httpRateLimit ratelimit.Limiter = ratelimit.New(2) // per second
+var httpRateLimit ratelimit.Limiter = ratelimit.New(2)        // per second
+var solScanHttpRateLimit ratelimit.Limiter = ratelimit.New(5) // per second
 var UNLIMIT_PAGE = 0
 
-func httpFetch(url string) (interface{}, error) {
-	httpRateLimit.Take()
+func httpFetch(url string, limit ratelimit.Limiter) (interface{}, error) {
+	limit.Take()
 	color.New(color.FgHiCyan).Println(url)
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -31,7 +32,7 @@ func httpFetch(url string) (interface{}, error) {
 }
 
 func fetchOne(endpoint string) Item {
-	val, err := fetchFromApi(fmt.Sprint(API_BASE_URL, "/", endpoint), nil)
+	val, err := fetchFromMEApi(fmt.Sprint(API_BASE_URL, "/", endpoint), nil)
 	return Item{V: val, E: err}
 }
 
@@ -53,12 +54,12 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 	var res interface{}
 	var err error
 	if batchSize > 0 {
-		res, err = fetchFromApi(
+		res, err = fetchFromMEApi(
 			fmt.Sprint(API_BASE_URL, "/", endpoint, "?offset=", offset, "&limit=", batchSize),
 			nil,
 		)
 	} else {
-		res, err = fetchFromApi(
+		res, err = fetchFromMEApi(
 			fmt.Sprint(API_BASE_URL, "/", endpoint),
 			nil,
 		)
@@ -79,10 +80,24 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 	fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, ch)
 }
 
-func fetchFromApi(url string, defVal interface{}) (interface{}, error) {
+func fetchFromMEApi(url string, defVal interface{}) (interface{}, error) {
 	pub := make(chan Item)
 	go func() {
-		rows, err := httpFetch(url)
+		rows, err := httpFetch(url, httpRateLimit)
+		pub <- Item{V: rows, E: err}
+		close(pub)
+	}()
+	val := <-pub
+	if val.E != nil {
+		return nil, val.E
+	}
+	return val.V, nil
+}
+
+func fetchFromSolScanApi(url string, defVal interface{}) (interface{}, error) {
+	pub := make(chan Item)
+	go func() {
+		rows, err := httpFetch(url, solScanHttpRateLimit)
 		pub <- Item{V: rows, E: err}
 		close(pub)
 	}()
