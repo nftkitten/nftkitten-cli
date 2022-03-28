@@ -60,7 +60,7 @@ func subscribeCollection(
 					logError(fmt.Errorf("listing1 is not map[string]interface{}"))
 				} else {
 					tokenMint := listing1["tokenMint"]
-					url := fmt.Sprint(SOLSCAN_PUBLIC_API_BASE_URL, "/account/tokenAddress=", tokenMint)
+					url := fmt.Sprint(SOLSCAN_PUBLIC_API_BASE_URL, "/account/", tokenMint)
 					if val, err := fetchFromSolScanApi(url, nil); err != nil {
 						logError(err)
 					} else if val != nil {
