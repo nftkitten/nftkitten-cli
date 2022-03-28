@@ -59,10 +59,9 @@ func subscribeCollection(
 						wg.Add(1)
 						go func() {
 							defer wg.Done()
-							for item := range dbExecuteMany(sqlForUpsert(table, "", symbol, bytes, statsBytes)) {
-								if item.E != nil {
-									logError(item.E)
-								}
+							_, err := dbExecuteMany(sqlForUpsert(table, "", symbol, bytes, statsBytes))
+							if err != nil {
+								logError(err)
 							}
 						}()
 					}

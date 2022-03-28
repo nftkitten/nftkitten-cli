@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"sync"
 
 	"github.com/fatih/color"
 	"github.com/tidwall/limiter"
@@ -150,21 +149,10 @@ func dbQueryIdSet(text string) map[string]bool {
 	return values
 }
 
-func dbExecuteMany(commands ...queryCommand) chan Item {
-	var wg sync.WaitGroup
-	var pub = make(chan Item)
+func dbExecuteMany(commands ...queryCommand) (res interface{}, err error) {
 	for _, command := range commands {
-		wg.Add(1)
 		cmd := command
-		go func() {
-			defer wg.Done()
-			res, err := dbExecute(cmd)
-			pub <- Item{V: res, E: err}
-		}()
+		res, err = dbExecute(cmd)
 	}
-	go func() {
-		wg.Wait()
-		close(pub)
-	}()
-	return pub
+	return res, err
 }
