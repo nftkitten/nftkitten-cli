@@ -10,11 +10,13 @@ import (
 	"github.com/spf13/cobra"
 
 	_ "github.com/lib/pq"
-	"github.com/reactivex/rxgo/v2"
 )
 
-var wg sync.WaitGroup
-var pool []rxgo.Disposed
+type Item struct {
+	V interface{}
+	E error
+}
+
 var db *sql.DB
 
 var Cmd = &cobra.Command{
@@ -73,31 +75,40 @@ func execute(apiBaseUrl string, full bool) {
 	log.Println(`initialize lookups`)
 
 	log.Println(`initialize streams`)
-	launchpadPub := make(chan rxgo.Item)
-	collectionPub := make(chan rxgo.Item)
+	var wg sync.WaitGroup
 
-	log.Println(`observe streams`)
-	pool = append(pool, rxgo.FromChannel(launchpadPub).
-		ForEach(subscribeLaunchpad(), logError, doNothing, rxgo.WithCPUPool()))
-	pool = append(pool, rxgo.FromChannel(collectionPub).
-		ForEach(subscribeCollection(apiBaseUrl), logError, doNothing, rxgo.WithCPUPool()))
+	subscribeLaunchpad := subscribeCollection("launchpad", apiBaseUrl, wg)
+	subscribeCollection := subscribeCollection("collection", apiBaseUrl, wg)
 
 	log.Println(`produce events`)
 	pageLimit := 10
 	if full {
 		pageLimit = UNLIMIT_PAGE
 	}
+	wg.Add(1)
 	go func() {
-		fetchMany(apiBaseUrl, "launchpad/collections", 500, pageLimit).Send(launchpadPub)
-		fetchMany(apiBaseUrl, "collections", 500, pageLimit).Send(collectionPub)
+		defer wg.Done()
+		for val := range fetchMany(apiBaseUrl, "launchpad/collections", 500, pageLimit) {
+			if val.E != nil {
+				logError(val.E)
+			} else {
+				subscribeLaunchpad(val.V)
+			}
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for val := range fetchMany(apiBaseUrl, "collections", 500, pageLimit) {
+			if val.E != nil {
+				logError(val.E)
+			} else {
+				subscribeCollection(val.V)
+			}
+		}
 	}()
 
 	log.Println("wait.")
-
-	for _, disposed := range pool {
-		<-disposed
-	}
-
-	pool = nil
+	wg.Wait()
 	log.Println("reload completed.")
 }

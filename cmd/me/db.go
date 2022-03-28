@@ -4,28 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/fatih/color"
-	"github.com/reactivex/rxgo/v2"
 	"github.com/tidwall/limiter"
 )
 
 var concurrentlimiter = limiter.New(20)
 
-func sqlForUpsertLaunchpad(
-	obj string,
-	id_prefix string,
-	values ...interface{},
-) queryCommand {
-	return queryCommand{
-		text: fmt.Sprint(`INSERT INTO me_`, obj, `(`, id_prefix, `id,data)VALUES($1::text,$2::jsonb)`,
-			`ON CONFLICT(`, id_prefix, `id)WHERE data@>$2::jsonb AND $2::jsonb@>data `,
-			`DO UPDATE SET data=$2::jsonb,updated_at=now()`),
-		values: values,
-	}
-}
-
-func sqlForUpsertCollection(
+func sqlForUpsert(
 	obj string,
 	id_prefix string,
 	values ...interface{},
@@ -163,14 +150,21 @@ func dbQueryIdSet(text string) map[string]bool {
 	return values
 }
 
-func dbExecuteMany(commands ...queryCommand) rxgo.Observable {
-	var pub = make(chan rxgo.Item)
+func dbExecuteMany(commands ...queryCommand) chan Item {
+	var wg sync.WaitGroup
+	var pub = make(chan Item)
+	for _, command := range commands {
+		wg.Add(1)
+		cmd := command
+		go func() {
+			defer wg.Done()
+			res, err := dbExecute(cmd)
+			pub <- Item{V: res, E: err}
+		}()
+	}
 	go func() {
-		for _, command := range commands {
-			res, err := dbExecute(command)
-			pub <- rxgo.Item{V: res, E: err}
-		}
+		wg.Wait()
 		close(pub)
 	}()
-	return rxgo.FromChannel(pub)
+	return pub
 }

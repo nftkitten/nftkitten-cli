@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/fatih/color"
-	"github.com/reactivex/rxgo/v2"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
 )
@@ -31,23 +30,18 @@ func httpFetch(url string) (interface{}, error) {
 	return output, nil
 }
 
-func fetchOne(url string, endpoint string) rxgo.Observable {
-	pub := make(chan rxgo.Item)
-	go func() {
-		val, err := fetchFromApi(fmt.Sprint(url, "/", endpoint), nil)
-		pub <- rxgo.Item{V: val, E: err}
-		close(pub)
-	}()
-	return rxgo.FromChannel(pub)
+func fetchOne(url string, endpoint string) Item {
+	val, err := fetchFromApi(fmt.Sprint(url, "/", endpoint), nil)
+	return Item{V: val, E: err}
 }
 
-func fetchMany(url string, endpoint string, batchSize int, maxPage int) rxgo.Observable {
-	pub := make(chan rxgo.Item)
-	go fetchManyRecursive(url, endpoint, batchSize, 0, maxPage, pub)
-	return rxgo.FromChannel(pub)
+func fetchMany(url string, endpoint string, batchSize int, maxPage int) chan Item {
+	ch := make(chan Item)
+	go fetchManyRecursive(url, endpoint, batchSize, 0, maxPage, ch)
+	return ch
 }
 
-func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, maxPage int, pub chan rxgo.Item) {
+func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, maxPage int, ch chan Item) {
 	if maxPage != UNLIMIT_PAGE && (1+offset/batchSize) > maxPage {
 		return
 	}
@@ -70,26 +64,26 @@ func fetchManyRecursive(url string, endpoint string, batchSize int, offset int, 
 		)
 	}
 	if err != nil {
-		pub <- rxgo.Item{E: err}
-		close(pub)
+		ch <- Item{E: err}
+		close(ch)
 		return
 	}
 	data, ok := res.([]interface{})
 	if !ok || len(data) <= 0 {
-		close(pub)
+		close(ch)
 		return
 	}
 	for _, d := range data {
-		pub <- rxgo.Item{V: d}
+		ch <- Item{V: d}
 	}
-	fetchManyRecursive(url, endpoint, batchSize, offset+batchSize, maxPage, pub)
+	fetchManyRecursive(url, endpoint, batchSize, offset+batchSize, maxPage, ch)
 }
 
 func fetchFromApi(url string, defVal interface{}) (interface{}, error) {
-	pub := make(chan rxgo.Item)
+	pub := make(chan Item)
 	go func() {
 		rows, err := httpFetch(url)
-		pub <- rxgo.Item{V: rows, E: err}
+		pub <- Item{V: rows, E: err}
 		close(pub)
 	}()
 	val := <-pub
