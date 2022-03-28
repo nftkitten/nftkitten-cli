@@ -95,7 +95,6 @@ func execute(full bool) {
 	}
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		for val := range fetchMany("launchpad/collections", 500, pageLimit) {
 			if val.E != nil {
 				logError(val.E)
@@ -103,10 +102,10 @@ func execute(full bool) {
 				subscribeLaunchpad(val.V)
 			}
 		}
+		wg.Done()
 	}()
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
 		for val := range fetchMany("collections", 500, pageLimit) {
 			if val.E != nil {
 				logError(val.E)
@@ -114,6 +113,7 @@ func execute(full bool) {
 				subscribeCollection(val.V)
 			}
 		}
+		wg.Done()
 	}()
 
 	log.Println("wait.")
