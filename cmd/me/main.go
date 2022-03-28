@@ -100,6 +100,7 @@ func execute(full bool) {
 			if val.E != nil {
 				logError(val.E)
 			} else {
+				wg.Add(1)
 				subscribeLaunchpad(val.V)
 			}
 		}
