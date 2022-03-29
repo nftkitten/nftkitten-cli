@@ -11,7 +11,6 @@ func subscribeCollection(
 	wg sync.WaitGroup,
 ) func(item interface{}) {
 	return func(item interface{}) {
-		defer wg.Done()
 		m := item.(map[string]interface{})
 		symbol := fmt.Sprint(m["symbol"])
 
