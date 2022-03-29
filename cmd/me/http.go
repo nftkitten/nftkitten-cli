@@ -86,7 +86,7 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 		ch <- Item{V: d}
 	}
 	wg.Add(1)
-	go fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, ch)
+	go fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, wg, ch)
 }
 
 func fetchFromMEApi(url string, defVal interface{}) (interface{}, error) {
