@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
@@ -41,13 +42,15 @@ func fetchOne(endpoint string) Item {
 	return Item{V: val, E: err}
 }
 
-func fetchMany(endpoint string, batchSize int, maxPage int) chan Item {
+func fetchMany(endpoint string, batchSize int, maxPage int, wg sync.WaitGroup) chan Item {
 	ch := make(chan Item)
-	go fetchManyRecursive(endpoint, batchSize, 0, maxPage, ch)
+	wg.Add(1)
+	go fetchManyRecursive(endpoint, batchSize, 0, maxPage, wg, ch)
 	return ch
 }
 
-func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int, ch chan Item) {
+func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int, wg sync.WaitGroup, ch chan Item) {
+	defer wg.Done()
 	if maxPage != UNLIMIT_PAGE && (1+offset/batchSize) > maxPage {
 		return
 	}
@@ -82,7 +85,8 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 	for _, d := range data {
 		ch <- Item{V: d}
 	}
-	fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, ch)
+	wg.Add(1)
+	go fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, ch)
 }
 
 func fetchFromMEApi(url string, defVal interface{}) (interface{}, error) {

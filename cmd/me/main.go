@@ -96,7 +96,7 @@ func execute(full bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for val := range fetchMany("launchpad/collections", 500, pageLimit) {
+		for val := range fetchMany("launchpad/collections", 500, pageLimit, wg) {
 			if val.E != nil {
 				logError(val.E)
 			} else {
@@ -107,7 +107,7 @@ func execute(full bool) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for val := range fetchMany("collections", 500, pageLimit) {
+		for val := range fetchMany("collections", 500, pageLimit, wg) {
 			if val.E != nil {
 				logError(val.E)
 			} else {
