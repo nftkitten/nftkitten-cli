@@ -68,8 +68,6 @@ var Cmd = &cobra.Command{
 			log.Fatalln(err)
 		}
 		execute(full)
-		db.Close()
-		db = nil
 	},
 }
 
