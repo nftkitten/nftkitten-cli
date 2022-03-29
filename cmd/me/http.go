@@ -90,29 +90,9 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 }
 
 func fetchFromMEApi(url string, defVal interface{}) (interface{}, error) {
-	pub := make(chan Item)
-	go func() {
-		rows, err := httpFetch(url, httpRateLimit)
-		pub <- Item{V: rows, E: err}
-		close(pub)
-	}()
-	val := <-pub
-	if val.E != nil {
-		return nil, val.E
-	}
-	return val.V, nil
+	return httpFetch(url, httpRateLimit)
 }
 
 func fetchFromSolScanApi(url string, defVal interface{}) (interface{}, error) {
-	pub := make(chan Item)
-	go func() {
-		rows, err := httpFetch(url, solScanHttpRateLimit)
-		pub <- Item{V: rows, E: err}
-		close(pub)
-	}()
-	val := <-pub
-	if val.E != nil {
-		return nil, val.E
-	}
-	return val.V, nil
+	return httpFetch(url, solScanHttpRateLimit)
 }
