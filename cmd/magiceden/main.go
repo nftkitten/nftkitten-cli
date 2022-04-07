@@ -18,16 +18,16 @@ import (
 
 var Cmd = &cobra.Command{
 	Use:     "magiceden",
-	Example: "ENDPOINT=https://api-mainnet.magiceden.dev/v2/collections LIMIT=500 nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
+	Example: "ENDPOINTS=https://api-mainnet.magiceden.dev/v2/collections LIMIT=500 nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
-		if endpoint, _ := os.LookupEnv("ENDPOINT"); endpoint == "" {
+		if endpoints, _ := os.LookupEnv("ENDPOINTS"); endpoints == "" {
 			log.Fatalln("No ENDPOINT")
 		} else {
 			limit := lookupEnvToI("LIMIT", 0)
 			if rate := lookupEnvToI("RATE", 2); rate <= 0 {
-				execute(endpoint, limit, 2)
+				execute(strings.Split(endpoints, "\n"), limit, 2)
 			} else {
-				execute(endpoint, limit, rate)
+				execute(strings.Split(endpoints, "\n"), limit, rate)
 			}
 		}
 	},
@@ -43,32 +43,43 @@ func lookupEnvToI(key string, defVal int) int {
 	}
 }
 
-func execute(endpoint string, limit int, rate int) {
-	log.Println(fmt.Sprint("ENDPOINT ", endpoint))
+func execute(endpoints []string, limit int, rate int) {
+	log.Println(fmt.Sprint("ENDPOINT ", strings.Join(endpoints, "\n")))
 	log.Println(fmt.Sprint("LIMIT ", limit))
+	limiter := ratelimit.New(rate)
+	fmt.Print("[")
+	sep := ""
 
 	if limit > 0 {
-		if strings.Contains(endpoint, "?") {
-			endpoint += "&"
-		} else {
-			endpoint += "?"
+		for _, endpoint := range endpoints {
+			if strings.Contains(endpoint, "?") {
+				endpoint += "&"
+			} else {
+				endpoint += "?"
+			}
+			fetchMany(endpoint, &sep, limiter, limit)
 		}
-		limiter := ratelimit.New(rate)
-		fmt.Print("[")
-		fetchMany(endpoint, limiter, limit)
-		fmt.Print("]")
-	} else if res, err := fetchOne(endpoint); err != nil {
-		color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-	} else if out, err := json.Marshal(res); err != nil {
-		panic(err)
 	} else {
-		fmt.Print(string(out))
+		for _, endpoint := range endpoints {
+			limiter.Take()
+
+			if res, err := sendRequest(endpoint); err != nil {
+				color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
+			} else if out, err := json.Marshal(res); err != nil {
+				panic(err)
+			} else {
+				fmt.Print(sep)
+				fmt.Print(string(out))
+				sep = ","
+			}
+		}
 	}
 
+	fmt.Print("]")
 	log.Println("done")
 }
 
-func fetchOne(url string) (interface{}, error) {
+func sendRequest(url string) (interface{}, error) {
 	log.Println(url)
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -85,25 +96,21 @@ func fetchOne(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
-	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
+func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int) {
+	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
 		panic(err)
 	} else if data, ok := res.([]interface{}); !ok {
 		panic("Response is not array")
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
-		if out, err := json.Marshal(data[0]); err != nil {
-			panic(err)
-		} else {
-			fmt.Print(string(out))
-		}
-		for i := 1; i < size; i++ {
-			fmt.Print(",")
-			if out, err := json.Marshal(data[i]); err != nil {
+		for _, row := range data {
+			if out, err := json.Marshal(row); err != nil {
 				panic(err)
 			} else {
+				fmt.Print(*sep)
 				fmt.Print(string(out))
+				*sep = ","
 			}
 		}
 		if size >= limit {
@@ -114,18 +121,18 @@ func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
 
 func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, limit int) {
 	limiter.Take()
-	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
+	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
 		panic(err)
 	} else if data, ok := res.([]interface{}); !ok {
 		panic("Response is not array")
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
-		for i := 0; i < size; i++ {
-			fmt.Print(",")
-			if out, err := json.Marshal(data[i]); err != nil {
+		for _, row := range data {
+			if out, err := json.Marshal(row); err != nil {
 				panic(err)
 			} else {
+				fmt.Print(",")
 				fmt.Print(string(out))
 			}
 		}

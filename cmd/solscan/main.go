@@ -18,16 +18,16 @@ import (
 
 var Cmd = &cobra.Command{
 	Use:     "solscan",
-	Example: "ENDPOINT=https://api.solscan.io/collection?sortBy=volume LIMIT=500 nftkitten solscan >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
+	Example: "ENDPOINTS=https://api.solscan.io/collection?sortBy=volume LIMIT=500 nftkitten solscan >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
-		if endpoint, _ := os.LookupEnv("ENDPOINT"); endpoint == "" {
-			log.Fatalln("No ENDPOINT")
+		if endpoints, _ := os.LookupEnv("ENDPOINTS"); endpoints == "" {
+			log.Fatalln("No ENDPOINTS")
 		} else {
 			limit := lookupEnvToI("LIMIT", 0)
 			if rate := lookupEnvToI("RATE", 5); rate <= 0 {
-				execute(endpoint, limit, 5)
+				execute(strings.Split(endpoints, "\n"), limit, 5)
 			} else {
-				execute(endpoint, limit, rate)
+				execute(strings.Split(endpoints, "\n"), limit, rate)
 			}
 		}
 	},
@@ -43,38 +43,49 @@ func lookupEnvToI(key string, defVal int) int {
 	}
 }
 
-func execute(endpoint string, limit int, rate int) {
-	log.Println(fmt.Sprint("ENDPOINT ", endpoint))
+func execute(endpoints []string, limit int, rate int) {
+	log.Println(fmt.Sprint("ENDPOINT ", strings.Join(endpoints, "\n")))
 	log.Println(fmt.Sprint("LIMIT ", limit))
+	limiter := ratelimit.New(rate)
+	sep := ""
+	fmt.Print("[")
 
 	if limit > 0 {
-		if strings.Contains(endpoint, "?") {
-			endpoint += "&"
-		} else {
-			endpoint += "?"
+		for _, endpoint := range endpoints {
+			if strings.Contains(endpoint, "?") {
+				endpoint += "&"
+			} else {
+				endpoint += "?"
+			}
+			fetchMany(endpoint, &sep, limiter, limit)
 		}
-		limiter := ratelimit.New(rate)
-		fmt.Print("[")
-		fetchMany(endpoint, limiter, limit)
-		fmt.Print("]")
-	} else if res, err := fetchOne(endpoint); err != nil {
-		color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-	} else if rpn, ok := res.(map[string]interface{}); !ok {
-		panic("Response is not object")
-	} else if success, ok := rpn["success"].(bool); !ok || !success {
-		panic("success is not true")
-	} else if data, ok := rpn["data"].(interface{}); !ok || data == nil {
-		panic("data is not found")
-	} else if out, err := json.Marshal(data); err != nil {
-		panic(err)
 	} else {
-		fmt.Print(string(out))
+		for _, endpoint := range endpoints {
+			limiter.Take()
+
+			if res, err := sendRequest(endpoint); err != nil {
+				color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
+			} else if rpn, ok := res.(map[string]interface{}); !ok {
+				panic("Response is not object")
+			} else if success, ok := rpn["success"].(bool); !ok || !success {
+				panic("success is not true")
+			} else if data, ok := rpn["data"].(interface{}); !ok || data == nil {
+				panic("data is not found")
+			} else if out, err := json.Marshal(data); err != nil {
+				panic(err)
+			} else {
+				fmt.Print(sep)
+				fmt.Print(string(out))
+				sep = ","
+			}
+		}
 	}
 
+	fmt.Print("]")
 	log.Println("done")
 }
 
-func fetchOne(url string) (interface{}, error) {
+func sendRequest(url string) (interface{}, error) {
 	log.Println(url)
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -91,8 +102,8 @@ func fetchOne(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
-	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
+func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int) {
+	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
 		panic(err)
 	} else if rpn, ok := res.(map[string]interface{}); !ok {
 		panic("Response is not object")
@@ -105,17 +116,13 @@ func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
-		if out, err := json.Marshal(data[0]); err != nil {
-			panic(err)
-		} else {
-			fmt.Print(string(out))
-		}
-		for i := 1; i < size; i++ {
-			fmt.Print(",")
-			if out, err := json.Marshal(data[i]); err != nil {
+		for _, row := range data {
+			if out, err := json.Marshal(row); err != nil {
 				panic(err)
 			} else {
+				fmt.Print(*sep)
 				fmt.Print(string(out))
+				*sep = ","
 			}
 		}
 		if float64(size) < total {
@@ -126,7 +133,7 @@ func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
 
 func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, limit int) {
 	limiter.Take()
-	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
+	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
 		panic(err)
 	} else if rpn, ok := res.(map[string]interface{}); !ok {
 		panic("Response is not object")
@@ -140,10 +147,10 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 		return
 	} else {
 		for i := 0; i < size; i++ {
-			fmt.Print(",")
 			if out, err := json.Marshal(data[i]); err != nil {
 				panic(err)
 			} else {
+				fmt.Print(",")
 				fmt.Print(string(out))
 			}
 		}
