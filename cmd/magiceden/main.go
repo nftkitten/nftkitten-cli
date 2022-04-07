@@ -1,4 +1,4 @@
-package solscan
+package magiceden
 
 import (
 	"encoding/json"
@@ -17,15 +17,15 @@ import (
 )
 
 var Cmd = &cobra.Command{
-	Use:     "solscan",
-	Example: "ENDPOINT=https://api.solscan.io/collection?sortBy=volume LIMIT=500 nftkitten solscan >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
+	Use:     "magiceden",
+	Example: "ENDPOINT=https://api-mainnet.magiceden.dev/v2/collections LIMIT=500 nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
 		if endpoint, _ := os.LookupEnv("ENDPOINT"); endpoint == "" {
 			log.Fatalln("No ENDPOINT")
 		} else {
 			limit := lookupEnvToI("LIMIT", 0)
-			if rate := lookupEnvToI("RATE", 5); rate <= 0 {
-				execute(endpoint, limit, 5)
+			if rate := lookupEnvToI("RATE", 2); rate <= 0 {
+				execute(endpoint, limit, 2)
 			} else {
 				execute(endpoint, limit, rate)
 			}
@@ -59,13 +59,7 @@ func execute(endpoint string, limit int, rate int) {
 		fmt.Print("]")
 	} else if res, err := fetchOne(endpoint); err != nil {
 		color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-	} else if rpn, ok := res.(map[string]interface{}); !ok {
-		panic("Response is not object")
-	} else if success, ok := rpn["success"].(bool); !ok || !success {
-		panic("success is not true")
-	} else if data, ok := rpn["data"].(interface{}); !ok || data == nil {
-		panic("data is not found")
-	} else if out, err := json.Marshal(data); err != nil {
+	} else if out, err := json.Marshal(res); err != nil {
 		panic(err)
 	} else {
 		fmt.Print(string(out))
@@ -94,14 +88,8 @@ func fetchOne(url string) (interface{}, error) {
 func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
 	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
 		panic(err)
-	} else if rpn, ok := res.(map[string]interface{}); !ok {
-		panic("Response is not object")
-	} else if success, ok := rpn["success"].(bool); !ok || !success {
-		panic("success is not true")
-	} else if total, ok := rpn["total"].(float64); !ok {
-		panic("total is not number")
-	} else if data, ok := rpn["data"].([]interface{}); !ok {
-		panic("data is not array")
+	} else if data, ok := res.([]interface{}); !ok {
+		panic("Response is not array")
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
@@ -118,7 +106,7 @@ func fetchMany(endpoint string, limiter ratelimit.Limiter, limit int) {
 				fmt.Print(string(out))
 			}
 		}
-		if float64(size) < total {
+		if size >= limit {
 			fetchManyRecursive(endpoint, limiter, size, limit)
 		}
 	}
@@ -128,14 +116,8 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 	limiter.Take()
 	if res, err := fetchOne(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
 		panic(err)
-	} else if rpn, ok := res.(map[string]interface{}); !ok {
-		panic("Response is not object")
-	} else if success, ok := rpn["success"].(bool); !ok || !success {
-		panic("success is not true")
-	} else if total, ok := rpn["total"].(float64); !ok {
-		panic("total is not int")
-	} else if data, ok := rpn["data"].([]interface{}); !ok {
-		panic("data is not array")
+	} else if data, ok := res.([]interface{}); !ok {
+		panic("Response is not array")
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
@@ -147,7 +129,7 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 				fmt.Print(string(out))
 			}
 		}
-		if float64(offset+size) < total {
+		if size >= limit {
 			fetchManyRecursive(endpoint, limiter, offset+size, limit)
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/fatih/color"
 	"github.com/tidwall/limiter"
@@ -37,9 +38,9 @@ func dbExecute(command queryCommand) (sql.Result, error) {
 	concurrentlimiter.Begin()
 	defer concurrentlimiter.End()
 	if len(command.text) > 50 {
-		color.New(color.FgYellow).Println(command.text[:50] + "...")
+		color.New(color.FgYellow).Fprintln(os.Stderr, command.text[:50]+"...")
 	} else {
-		color.New(color.FgYellow).Println(command.text + "...")
+		color.New(color.FgYellow).Fprintln(os.Stderr, command.text+"...")
 	}
 	args := command.values
 	stmt, err := db.Prepare(command.text)
@@ -60,9 +61,9 @@ func dbQuery(text string) ([]map[string]interface{}, error) {
 	concurrentlimiter.Begin()
 	defer concurrentlimiter.End()
 	if len(text) > 50 {
-		color.New(color.FgYellow).Println(text[:50] + "...")
+		color.New(color.FgYellow).Fprintln(os.Stderr, text[:50]+"...")
 	} else {
-		color.New(color.FgYellow).Println(text + "...")
+		color.New(color.FgYellow).Fprintln(os.Stderr, text+"...")
 	}
 	rows, err := db.Query(text)
 	if err != nil {

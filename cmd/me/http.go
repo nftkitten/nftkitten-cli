@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/fatih/color"
@@ -19,9 +20,9 @@ func httpFetch(url string, limit ratelimit.Limiter) (interface{}, error) {
 	limit.Take()
 	switch limit {
 	case solScanHttpRateLimit:
-		color.New(color.FgHiGreen).Println(url)
+		color.New(color.FgHiGreen).Fprintln(os.Stderr, url)
 	default:
-		color.New(color.FgHiCyan).Println(url)
+		color.New(color.FgHiCyan).Fprintln(os.Stderr, url)
 	}
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
@@ -85,8 +86,10 @@ func fetchManyRecursive(endpoint string, batchSize int, offset int, maxPage int,
 	for _, d := range data {
 		ch <- Item{V: d}
 	}
-	wg.Add(1)
-	go fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, wg, ch)
+	if len(data) >= batchSize {
+		wg.Add(1)
+		go fetchManyRecursive(endpoint, batchSize, offset+batchSize, maxPage, wg, ch)
+	}
 }
 
 func fetchFromMEApi(url string, defVal interface{}) (interface{}, error) {
