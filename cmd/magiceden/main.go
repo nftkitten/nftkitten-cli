@@ -52,6 +52,10 @@ func execute(endpoints []string, limit int, rate int) {
 
 	if limit > 0 {
 		for _, endpoint := range endpoints {
+			endpoint = strings.TrimSpace(endpoint)
+			if endpoint == "" {
+				continue
+			}
 			if strings.Contains(endpoint, "?") {
 				endpoint += "&"
 			} else {
@@ -61,6 +65,10 @@ func execute(endpoints []string, limit int, rate int) {
 		}
 	} else {
 		for _, endpoint := range endpoints {
+			endpoint = strings.TrimSpace(endpoint)
+			if endpoint == "" {
+				continue
+			}
 			limiter.Take()
 
 			if res, err := sendRequest(endpoint); err != nil {
