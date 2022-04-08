@@ -25,9 +25,9 @@ var Cmd = &cobra.Command{
 		} else {
 			limit := lookupEnvToI("LIMIT", 0)
 			if rate := lookupEnvToI("RATE", 2); rate <= 0 {
-				execute(strings.Split(endpoints, "\n"), limit, 2)
+				execute(strings.Split(os.ExpandEnv(endpoints), "\n"), limit, 2)
 			} else {
-				execute(strings.Split(endpoints, "\n"), limit, rate)
+				execute(strings.Split(os.ExpandEnv(endpoints), "\n"), limit, rate)
 			}
 		}
 	},
