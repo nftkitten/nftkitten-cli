@@ -88,8 +88,8 @@ func printRow(row interface{}, sep *string) {
 	if out, err := json.Marshal(row); err != nil {
 		panic(err)
 	} else {
-		fmt.Print(*sep)
-		fmt.Print(string(out))
+		os.Stdout.WriteString(*sep)
+		os.Stdout.Write(out)
 		*sep = "\n"
 	}
 }
