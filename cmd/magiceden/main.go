@@ -147,24 +147,23 @@ func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit in
 			printRow(row, sep)
 		}
 		if size >= limit {
-			fetchManyRecursive(endpoint, limiter, size, limit)
+			fetchManyRecursive(endpoint, sep, limiter, size, limit)
 		}
 	}
 }
 
-func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, limit int) {
+func fetchManyRecursive(endpoint string, sep *string, limiter ratelimit.Limiter, offset int, limit int) {
 	limiter.Take()
 	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
 		panic(err)
 	} else if data, ok := res.([]interface{}); !ok {
 		panic("Response is not array")
 	} else if size := len(data); size > 0 {
-		sep := ""
 		for _, row := range data {
-			printRow(row, &sep)
+			printRow(row, sep)
 		}
 		if size >= limit {
-			fetchManyRecursive(endpoint, limiter, offset+size, limit)
+			fetchManyRecursive(endpoint, sep, limiter, offset+size, limit)
 		}
 	}
 }
