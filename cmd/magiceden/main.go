@@ -66,6 +66,7 @@ func execute(limit int, rate int) {
 			if endpoint == "" {
 				continue
 			}
+
 			limiter.Take()
 
 			if res, err := sendRequest(endpoint); err != nil {
@@ -135,13 +136,12 @@ func sendRequest(url string) (interface{}, error) {
 }
 
 func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int) {
+	limiter.Take()
 	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
 		panic(err)
 	} else if data, ok := res.([]interface{}); !ok {
 		panic("Response is not array")
-	} else if size := len(data); size <= 0 {
-		return
-	} else {
+	} else if size := len(data); size > 0 {
 		for _, row := range data {
 			printRow(row, sep)
 		}
@@ -157,9 +157,7 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 		panic(err)
 	} else if data, ok := res.([]interface{}); !ok {
 		panic("Response is not array")
-	} else if size := len(data); size <= 0 {
-		return
-	} else {
+	} else if size := len(data); size > 0 {
 		sep := ""
 		for _, row := range data {
 			printRow(row, &sep)
