@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -46,6 +47,7 @@ func execute(limit int, rate int) {
 	limiter := ratelimit.New(rate)
 	sep := ""
 	scanner := bufio.NewScanner(os.Stdin)
+	var wg sync.WaitGroup
 
 	if limit > 0 {
 		for scanner.Scan() {
@@ -58,7 +60,7 @@ func execute(limit int, rate int) {
 			} else {
 				endpoint += "?"
 			}
-			fetchMany(endpoint, &sep, limiter, limit)
+			fetchMany(endpoint, &sep, limiter, limit, wg)
 		}
 	} else {
 		for scanner.Scan() {
@@ -72,10 +74,12 @@ func execute(limit int, rate int) {
 			if res, err := sendRequest(endpoint); err != nil {
 				color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
 			} else {
-				printRow(res, &sep)
+				printRow(res, &sep, wg)
 			}
 		}
 	}
+
+	wg.Wait()
 
 	if err := scanner.Err(); err != nil {
 		panic(err)
@@ -84,14 +88,19 @@ func execute(limit int, rate int) {
 	log.Println("done")
 }
 
-func printRow(row interface{}, sep *string) {
-	if out, err := json.Marshal(row); err != nil {
-		panic(err)
-	} else {
-		os.Stdout.WriteString(*sep)
-		os.Stdout.Write(out)
-		*sep = "\n"
-	}
+func printRow(row interface{}, sep *string, wg sync.WaitGroup) {
+	s := *sep
+	*sep = "\n"
+	wg.Add(1)
+	go func() {
+		if out, err := json.Marshal(row); err != nil {
+			panic(err)
+		} else {
+			os.Stdout.WriteString(s)
+			os.Stdout.Write(out)
+			wg.Done()
+		}
+	}()
 }
 
 func sendRequest(url string) (interface{}, error) {
@@ -135,7 +144,7 @@ func sendRequest(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int) {
+func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int, wg sync.WaitGroup) {
 	limiter.Take()
 	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
 		panic(err)
@@ -143,15 +152,15 @@ func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit in
 		panic("Response is not array")
 	} else if size := len(data); size > 0 {
 		for _, row := range data {
-			printRow(row, sep)
+			printRow(row, sep, wg)
 		}
 		if size >= limit {
-			fetchManyRecursive(endpoint, limiter, size, limit)
+			fetchManyRecursive(endpoint, limiter, size, limit, wg)
 		}
 	}
 }
 
-func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, limit int) {
+func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, limit int, wg sync.WaitGroup) {
 	limiter.Take()
 	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
 		panic(err)
@@ -160,10 +169,10 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 	} else if size := len(data); size > 0 {
 		sep := ""
 		for _, row := range data {
-			printRow(row, &sep)
+			printRow(row, &sep, wg)
 		}
 		if size >= limit {
-			fetchManyRecursive(endpoint, limiter, offset+size, limit)
+			fetchManyRecursive(endpoint, limiter, offset+size, limit, wg)
 		}
 	}
 }
