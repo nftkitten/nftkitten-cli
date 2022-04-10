@@ -1,6 +1,8 @@
 package magiceden
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -18,17 +20,13 @@ import (
 
 var Cmd = &cobra.Command{
 	Use:     "magiceden",
-	Example: "ENDPOINTS=https://api-mainnet.magiceden.dev/v2/collections LIMIT=500 nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
+	Example: "LIMIT=500 echo https://api-mainnet.magiceden.dev/v2/collections > nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
-		if endpoints, _ := os.LookupEnv("ENDPOINTS"); endpoints == "" {
-			log.Fatalln("No ENDPOINT")
+		limit := lookupEnvToI("LIMIT", 0)
+		if rate := lookupEnvToI("RATE", 2); rate <= 0 {
+			execute(limit, 2)
 		} else {
-			limit := lookupEnvToI("LIMIT", 0)
-			if rate := lookupEnvToI("RATE", 2); rate <= 0 {
-				execute(strings.Split(os.ExpandEnv(endpoints), "\n"), limit, 2)
-			} else {
-				execute(strings.Split(os.ExpandEnv(endpoints), "\n"), limit, rate)
-			}
+			execute(limit, rate)
 		}
 	},
 }
@@ -43,16 +41,15 @@ func lookupEnvToI(key string, defVal int) int {
 	}
 }
 
-func execute(endpoints []string, limit int, rate int) {
-	log.Println(fmt.Sprint("ENDPOINT ", strings.Join(endpoints, "\n")))
+func execute(limit int, rate int) {
 	log.Println(fmt.Sprint("LIMIT ", limit))
 	limiter := ratelimit.New(rate)
-	fmt.Print("[")
 	sep := ""
+	scanner := bufio.NewScanner(os.Stdin)
 
 	if limit > 0 {
-		for _, endpoint := range endpoints {
-			endpoint = strings.TrimSpace(endpoint)
+		for scanner.Scan() {
+			endpoint := strings.TrimSpace(os.ExpandEnv(scanner.Text()))
 			if endpoint == "" {
 				continue
 			}
@@ -64,8 +61,8 @@ func execute(endpoints []string, limit int, rate int) {
 			fetchMany(endpoint, &sep, limiter, limit)
 		}
 	} else {
-		for _, endpoint := range endpoints {
-			endpoint = strings.TrimSpace(endpoint)
+		for scanner.Scan() {
+			endpoint := strings.TrimSpace(os.ExpandEnv(scanner.Text()))
 			if endpoint == "" {
 				continue
 			}
@@ -78,12 +75,15 @@ func execute(endpoints []string, limit int, rate int) {
 			} else {
 				fmt.Print(sep)
 				fmt.Print(string(out))
-				sep = ","
+				sep = "\n"
 			}
 		}
 	}
 
-	fmt.Print("]")
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+
 	log.Println("done")
 }
 
@@ -92,15 +92,39 @@ func sendRequest(url string) (interface{}, error) {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
 	req.Header.SetMethod("GET")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:99.0) Gecko/20100101 Firefox/99.0")
+	req.Header.Set("Accept", "application/json, text/plain, */*")
+	req.Header.Set("Accept-Language", "en-GB,en;q=0.5")
+	req.Header.Set("Accept-Encoding", "gzip")
+	req.Header.Set("Referer", "https://magiceden.io/")
+	req.Header.Set("Origin", "https://magiceden.io")
+	req.Header.Set("DNT", "1")
+	req.Header.Set("Connection", "keep-alive")
+	req.Header.Set("Sec-Fetch-Dest", "empty")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Site", "same-site")
+	req.Header.Set("Pragma", "no-cache")
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("TE", "trailers")
 	req.SetRequestURI(url)
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseResponse(resp)
 	if err := fasthttp.Do(req, resp); err != nil {
 		return nil, err
 	} else {
-		var output interface{}
-		json.Unmarshal(resp.Body(), &output)
-		return output, nil
+		contentEncoding := resp.Header.Peek("Content-Encoding")
+		if !bytes.EqualFold(contentEncoding, []byte("gzip")) {
+			body := resp.Body()
+			var output interface{}
+			json.Unmarshal(body, &output)
+			return output, nil
+		} else if body, err := resp.BodyGunzip(); err != nil {
+			return nil, err
+		} else {
+			var output interface{}
+			json.Unmarshal(body, &output)
+			return output, nil
+		}
 	}
 }
 
@@ -118,7 +142,7 @@ func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit in
 			} else {
 				fmt.Print(*sep)
 				fmt.Print(string(out))
-				*sep = ","
+				*sep = "\n"
 			}
 		}
 		if size >= limit {
@@ -140,7 +164,7 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 			if out, err := json.Marshal(row); err != nil {
 				panic(err)
 			} else {
-				fmt.Print(",")
+				fmt.Print("\n")
 				fmt.Print(string(out))
 			}
 		}
