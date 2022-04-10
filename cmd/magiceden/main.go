@@ -20,7 +20,7 @@ import (
 
 var Cmd = &cobra.Command{
 	Use:     "magiceden",
-	Example: "LIMIT=500 echo https://api-mainnet.magiceden.dev/v2/collections > nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
+	Example: "echo https://api-mainnet.magiceden.dev/v2/collections > LIMIT=500 ./nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
 		limit := lookupEnvToI("LIMIT", 0)
 		if rate := lookupEnvToI("RATE", 2); rate <= 0 {
@@ -70,12 +70,8 @@ func execute(limit int, rate int) {
 
 			if res, err := sendRequest(endpoint); err != nil {
 				color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-			} else if out, err := json.Marshal(res); err != nil {
-				panic(err)
 			} else {
-				fmt.Print(sep)
-				fmt.Print(string(out))
-				sep = "\n"
+				printRow(res, &sep)
 			}
 		}
 	}
@@ -85,6 +81,16 @@ func execute(limit int, rate int) {
 	}
 
 	log.Println("done")
+}
+
+func printRow(row interface{}, sep *string) {
+	if out, err := json.Marshal(row); err != nil {
+		panic(err)
+	} else {
+		fmt.Print(*sep)
+		fmt.Print(string(out))
+		*sep = "\n"
+	}
 }
 
 func sendRequest(url string) (interface{}, error) {
@@ -137,13 +143,7 @@ func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit in
 		return
 	} else {
 		for _, row := range data {
-			if out, err := json.Marshal(row); err != nil {
-				panic(err)
-			} else {
-				fmt.Print(*sep)
-				fmt.Print(string(out))
-				*sep = "\n"
-			}
+			printRow(row, sep)
 		}
 		if size >= limit {
 			fetchManyRecursive(endpoint, limiter, size, limit)
@@ -160,13 +160,9 @@ func fetchManyRecursive(endpoint string, limiter ratelimit.Limiter, offset int, 
 	} else if size := len(data); size <= 0 {
 		return
 	} else {
+		sep := ""
 		for _, row := range data {
-			if out, err := json.Marshal(row); err != nil {
-				panic(err)
-			} else {
-				fmt.Print("\n")
-				fmt.Print(string(out))
-			}
+			printRow(row, &sep)
 		}
 		if size >= limit {
 			fetchManyRecursive(endpoint, limiter, offset+size, limit)
