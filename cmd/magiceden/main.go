@@ -166,20 +166,26 @@ func sendRequest(url string) (interface{}, error) {
 }
 
 func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{"last": ""}); endpoint != "" {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+		"lastEndpoint": "",
+		"lastRecord":   nil,
+	}); endpoint != "" {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else {
 			printRow(res, sep)
-			fetchManyRecursive(endpointTmpl, endpoint, sep, limiter)
+			fetchManyRecursive(endpointTmpl, endpoint, res, sep, limiter)
 		}
 	}
 }
 
-func fetchManyRecursive(endpointTmpl *template.Template, last string, sep *string, limiter ratelimit.Limiter) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{"last": last}); endpoint != "" {
+func fetchManyRecursive(endpointTmpl *template.Template, lastEndpoint string, lastRecord interface{}, sep *string, limiter ratelimit.Limiter) {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+		"lastEndpoint": lastEndpoint,
+		"lastRecord":   lastRecord,
+	}); endpoint != "" {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
@@ -190,7 +196,7 @@ func fetchManyRecursive(endpointTmpl *template.Template, last string, sep *strin
 			for _, row := range data {
 				printRow(row, sep)
 			}
-			fetchManyRecursive(endpointTmpl, last, sep, limiter)
+			fetchManyRecursive(endpointTmpl, lastEndpoint, lastRecord, sep, limiter)
 		}
 	}
 }
