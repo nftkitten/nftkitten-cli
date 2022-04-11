@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"log"
 	"os"
 	"strconv"
@@ -49,30 +50,33 @@ func execute(limit int, rate int) {
 
 	if limit > 0 {
 		for scanner.Scan() {
-			endpoint := strings.TrimSpace(os.ExpandEnv(scanner.Text()))
-			if endpoint == "" {
-				continue
+			if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
+				if endpointTmpl, err := template.New("endpoint").Parse(endpointText); err != nil {
+					panic(err)
+				} else {
+					fetchMany(endpointTmpl, &sep, limiter, limit)
+				}
 			}
-			if strings.Contains(endpoint, "?") {
-				endpoint += "&"
-			} else {
-				endpoint += "?"
-			}
-			fetchMany(endpoint, &sep, limiter, limit)
 		}
 	} else {
 		for scanner.Scan() {
-			endpoint := strings.TrimSpace(os.ExpandEnv(scanner.Text()))
-			if endpoint == "" {
-				continue
-			}
+			if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
+				if endpointTmpl, err := template.New("endpoint").Parse(endpointText); err != nil {
+					panic(err)
+				} else if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+					"limit":  0,
+					"offset": 0,
+				}); err != nil {
+					panic(err)
+				} else {
+					limiter.Take()
 
-			limiter.Take()
-
-			if res, err := sendRequest(endpoint); err != nil {
-				color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-			} else {
-				printRow(res, &sep)
+					if res, err := sendRequest(endpoint); err != nil {
+						color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
+					} else {
+						printRow(res, &sep)
+					}
+				}
 			}
 		}
 	}
@@ -82,6 +86,35 @@ func execute(limit int, rate int) {
 	}
 
 	log.Println("done")
+}
+
+func getTemplate(input string) *template.Template {
+	if endpointText := strings.TrimSpace(os.ExpandEnv(input)); endpointText != "" {
+		funcMap := template.FuncMap{
+			"add": func(val1 float64, val2 float64) float64 {
+				return val1 + val2
+			},
+			"subtract": func(val1 float64, val2 float64) float64 {
+				return val1 - val2
+			},
+			"subtract": func(val1 float64, val2 float64) float64 {
+				return val1 - val2
+			},
+		}
+		if endpointTmpl, err := template.New("endpoint").Funcs(funcMap).Parse(endpointText); err != nil {
+			endpointTmpl.
+		}
+	}
+	return nil
+}
+
+func getRequest(tmpl *template.Template, data interface{}) string {
+	var tpl bytes.Buffer
+	if err := tmpl.Execute(&tpl, data); err != nil {
+		return ""
+	} else {
+		return tpl.String()
+	}
 }
 
 func printRow(row interface{}, sep *string) {
@@ -136,34 +169,46 @@ func sendRequest(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpoint string, sep *string, limiter ratelimit.Limiter, limit int) {
-	limiter.Take()
-	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit)); err != nil {
-		panic(err)
-	} else if data, ok := res.([]interface{}); !ok {
-		panic("Response is not array")
-	} else if size := len(data); size > 0 {
-		for _, row := range data {
-			printRow(row, sep)
-		}
-		if size >= limit {
-			fetchManyRecursive(endpoint, sep, limiter, size, limit)
+func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter, limit int) {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+		"limit":  limit,
+		"offset": 0,
+	}); endpoint != "" {
+		limiter.Take()
+
+		if res, err := sendRequest(endpoint); err != nil {
+			panic(err)
+		} else if data, ok := res.([]interface{}); !ok {
+			panic("Response is not array")
+		} else if size := len(data); size > 0 {
+			for _, row := range data {
+				printRow(row, sep)
+			}
+			if size >= limit {
+				fetchManyRecursive(endpointTmpl, sep, limiter, size, limit)
+			}
 		}
 	}
 }
 
-func fetchManyRecursive(endpoint string, sep *string, limiter ratelimit.Limiter, offset int, limit int) {
-	limiter.Take()
-	if res, err := sendRequest(fmt.Sprint(endpoint, "limit=", limit, "&offset=", offset)); err != nil {
-		panic(err)
-	} else if data, ok := res.([]interface{}); !ok {
-		panic("Response is not array")
-	} else if size := len(data); size > 0 {
-		for _, row := range data {
-			printRow(row, sep)
-		}
-		if size >= limit {
-			fetchManyRecursive(endpoint, sep, limiter, offset+size, limit)
+func fetchManyRecursive(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter, offset int, limit int) {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+		"limit":  limit,
+		"offset": offset,
+	}); endpoint != "" {
+		limiter.Take()
+
+		if res, err := sendRequest(endpoint); err != nil {
+			panic(err)
+		} else if data, ok := res.([]interface{}); !ok {
+			panic("Response is not array")
+		} else if size := len(data); size > 0 {
+			for _, row := range data {
+				printRow(row, sep)
+			}
+			if size >= limit {
+				fetchManyRecursive(endpointTmpl, sep, limiter, offset+size, limit)
+			}
 		}
 	}
 }
