@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -47,8 +47,8 @@ func execute(rate int) {
 
 	for scanner.Scan() {
 		if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
-			if endpointTmpl := getTemplate(endpointText); endpointTmpl == nil {
-				panic("INVALID endpoint " + endpointText)
+			if endpointTmpl, err := getTemplate(endpointText); err != nil {
+				panic(err)
 			} else {
 				fetchMany(endpointTmpl, &sep, limiter)
 			}
@@ -62,54 +62,41 @@ func execute(rate int) {
 	log.Println("done")
 }
 
-func getTemplate(input string) *template.Template {
+func getTemplate(input string) (*template.Template, error) {
 	if endpointText := strings.TrimSpace(os.ExpandEnv(input)); endpointText != "" {
+		counters := map[string]int{}
 		funcMap := template.FuncMap{
-			"add": func(val1 string, val2 string) int {
-				v1, _ := strconv.Atoi(val1)
-				v2, _ := strconv.Atoi(val2)
-				return v1 + v2
-			},
-			"subtract": func(val1 string, val2 string) int {
-				v1, _ := strconv.Atoi(val1)
-				v2, _ := strconv.Atoi(val2)
-				return v1 - v2
-			},
-			"multiply": func(val1 string, val2 string) int {
-				v1, _ := strconv.Atoi(val1)
-				v2, _ := strconv.Atoi(val2)
-				return v1 * v2
-			},
-			"divide": func(val1 string, val2 string) int {
-				v1, _ := strconv.Atoi(val1)
-				v2, _ := strconv.Atoi(val2)
-				return v1 / v2
-			},
-			"atoi": func(val string) int {
-				v1, _ := strconv.Atoi(val)
-				return v1
-			},
-			"find": func(pattern string, val string) string {
-				if r, err := regexp.Compile(pattern); err != nil {
-					return ""
+			"counter": func(key string, step int, start int) int {
+				if val, ok := counters[key]; ok {
+					counters[key] = val + step
 				} else {
-					return r.FindString(val)
+					counters[key] = start
+				}
+				return counters[key]
+			},
+			"noCounter": func(key string) bool {
+				if _, ok := counters[key]; ok {
+					return false
+				} else {
+					return true
 				}
 			},
 		}
 		if endpointTmpl, err := template.New("endpoint").Funcs(funcMap).Parse(endpointText); err != nil {
-			return endpointTmpl
+			return nil, err
+		} else {
+			return endpointTmpl, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("invalid template")
 }
 
-func getRequest(tmpl *template.Template, data interface{}) string {
+func getRequest(tmpl *template.Template, data interface{}) (string, error) {
 	var tpl bytes.Buffer
 	if err := tmpl.Execute(&tpl, data); err != nil {
-		return ""
+		return "", err
 	} else {
-		return tpl.String()
+		return tpl.String(), nil
 	}
 }
 
@@ -166,15 +153,17 @@ func sendRequest(url string) (interface{}, error) {
 }
 
 func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+	if endpoint, err := getRequest(endpointTmpl, map[string]interface{}{
 		"lastEndpoint": "",
 		"lastRecord":   nil,
-	}); endpoint != "" {
+	}); err != nil {
+		panic(err)
+	} else if endpoint != "" {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
-		} else {
+		} else if res != nil {
 			printRow(res, sep)
 			fetchManyRecursive(endpointTmpl, endpoint, res, sep, limiter)
 		}
@@ -182,21 +171,19 @@ func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.L
 }
 
 func fetchManyRecursive(endpointTmpl *template.Template, lastEndpoint string, lastRecord interface{}, sep *string, limiter ratelimit.Limiter) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
+	if endpoint, err := getRequest(endpointTmpl, map[string]interface{}{
 		"lastEndpoint": lastEndpoint,
 		"lastRecord":   lastRecord,
-	}); endpoint != "" {
+	}); err != nil {
+		panic(err)
+	} else if endpoint != "" && endpoint != lastEndpoint {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
-		} else if data, ok := res.([]interface{}); !ok {
-			panic("Response is not array")
-		} else if size := len(data); size > 0 {
-			for _, row := range data {
-				printRow(row, sep)
-			}
-			fetchManyRecursive(endpointTmpl, lastEndpoint, lastRecord, sep, limiter)
+		} else if res != nil {
+			printRow(res, sep)
+			fetchManyRecursive(endpointTmpl, lastEndpoint, res, sep, limiter)
 		}
 	}
 }
