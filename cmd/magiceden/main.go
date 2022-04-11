@@ -4,14 +4,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
@@ -23,11 +22,10 @@ var Cmd = &cobra.Command{
 	Use:     "magiceden",
 	Example: "echo https://api-mainnet.magiceden.dev/v2/collections > LIMIT=500 ./nftkitten magiceden >.out.json; [ $? -eq 0 ] && mv .out.json out.json  || rm .out.json",
 	Run: func(cmd *cobra.Command, args []string) {
-		limit := lookupEnvToI("LIMIT", 0)
 		if rate := lookupEnvToI("RATE", 2); rate <= 0 {
-			execute(limit, 2)
+			execute(2)
 		} else {
-			execute(limit, rate)
+			execute(rate)
 		}
 	},
 }
@@ -42,41 +40,17 @@ func lookupEnvToI(key string, defVal int) int {
 	}
 }
 
-func execute(limit int, rate int) {
-	log.Println(fmt.Sprint("LIMIT ", limit))
+func execute(rate int) {
 	limiter := ratelimit.New(rate)
 	sep := ""
 	scanner := bufio.NewScanner(os.Stdin)
 
-	if limit > 0 {
-		for scanner.Scan() {
-			if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
-				if endpointTmpl, err := template.New("endpoint").Parse(endpointText); err != nil {
-					panic(err)
-				} else {
-					fetchMany(endpointTmpl, &sep, limiter, limit)
-				}
-			}
-		}
-	} else {
-		for scanner.Scan() {
-			if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
-				if endpointTmpl, err := template.New("endpoint").Parse(endpointText); err != nil {
-					panic(err)
-				} else if endpoint := getRequest(endpointTmpl, map[string]interface{}{
-					"limit":  0,
-					"offset": 0,
-				}); err != nil {
-					panic(err)
-				} else {
-					limiter.Take()
-
-					if res, err := sendRequest(endpoint); err != nil {
-						color.New(color.FgHiMagenta).Fprintln(os.Stderr, err.Error())
-					} else {
-						printRow(res, &sep)
-					}
-				}
+	for scanner.Scan() {
+		if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
+			if endpointTmpl := getTemplate(endpointText); endpointTmpl == nil {
+				panic("INVALID endpoint " + endpointText)
+			} else {
+				fetchMany(endpointTmpl, &sep, limiter)
 			}
 		}
 	}
@@ -91,18 +65,40 @@ func execute(limit int, rate int) {
 func getTemplate(input string) *template.Template {
 	if endpointText := strings.TrimSpace(os.ExpandEnv(input)); endpointText != "" {
 		funcMap := template.FuncMap{
-			"add": func(val1 float64, val2 float64) float64 {
-				return val1 + val2
+			"add": func(val1 string, val2 string) int {
+				v1, _ := strconv.Atoi(val1)
+				v2, _ := strconv.Atoi(val2)
+				return v1 + v2
 			},
-			"subtract": func(val1 float64, val2 float64) float64 {
-				return val1 - val2
+			"subtract": func(val1 string, val2 string) int {
+				v1, _ := strconv.Atoi(val1)
+				v2, _ := strconv.Atoi(val2)
+				return v1 - v2
 			},
-			"subtract": func(val1 float64, val2 float64) float64 {
-				return val1 - val2
+			"multiply": func(val1 string, val2 string) int {
+				v1, _ := strconv.Atoi(val1)
+				v2, _ := strconv.Atoi(val2)
+				return v1 * v2
+			},
+			"divide": func(val1 string, val2 string) int {
+				v1, _ := strconv.Atoi(val1)
+				v2, _ := strconv.Atoi(val2)
+				return v1 / v2
+			},
+			"atoi": func(val string) int {
+				v1, _ := strconv.Atoi(val)
+				return v1
+			},
+			"find": func(pattern string, val string) string {
+				if r, err := regexp.Compile(pattern); err != nil {
+					return ""
+				} else {
+					return r.FindString(val)
+				}
 			},
 		}
 		if endpointTmpl, err := template.New("endpoint").Funcs(funcMap).Parse(endpointText); err != nil {
-			endpointTmpl.
+			return endpointTmpl
 		}
 	}
 	return nil
@@ -169,33 +165,21 @@ func sendRequest(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter, limit int) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
-		"limit":  limit,
-		"offset": 0,
-	}); endpoint != "" {
+func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter) {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{"last": ""}); endpoint != "" {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
-		} else if data, ok := res.([]interface{}); !ok {
-			panic("Response is not array")
-		} else if size := len(data); size > 0 {
-			for _, row := range data {
-				printRow(row, sep)
-			}
-			if size >= limit {
-				fetchManyRecursive(endpointTmpl, sep, limiter, size, limit)
-			}
+		} else {
+			printRow(res, sep)
+			fetchManyRecursive(endpointTmpl, endpoint, sep, limiter)
 		}
 	}
 }
 
-func fetchManyRecursive(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter, offset int, limit int) {
-	if endpoint := getRequest(endpointTmpl, map[string]interface{}{
-		"limit":  limit,
-		"offset": offset,
-	}); endpoint != "" {
+func fetchManyRecursive(endpointTmpl *template.Template, last string, sep *string, limiter ratelimit.Limiter) {
+	if endpoint := getRequest(endpointTmpl, map[string]interface{}{"last": last}); endpoint != "" {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
@@ -206,9 +190,7 @@ func fetchManyRecursive(endpointTmpl *template.Template, sep *string, limiter ra
 			for _, row := range data {
 				printRow(row, sep)
 			}
-			if size >= limit {
-				fetchManyRecursive(endpointTmpl, sep, limiter, offset+size, limit)
-			}
+			fetchManyRecursive(endpointTmpl, last, sep, limiter)
 		}
 	}
 }
