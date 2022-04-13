@@ -30,6 +30,7 @@ require (
 	github.com/tidwall/limiter v0.4.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.35.0 // indirect
+	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect

@@ -15,7 +15,7 @@ import (
 	"github.com/valyala/fasthttp"
 	"go.uber.org/ratelimit"
 
-	_ "github.com/lib/pq"
+	"github.com/yalp/jsonpath"
 )
 
 var Cmd = &cobra.Command{
@@ -42,16 +42,15 @@ func lookupEnvToI(key string, defVal int) int {
 
 func execute(rate int) {
 	limiter := ratelimit.New(rate)
-	sep := ""
 	scanner := bufio.NewScanner(os.Stdin)
 
+	outputs := make(map[string]*os.File)
+
 	for scanner.Scan() {
-		if endpointText := strings.TrimSpace(os.ExpandEnv(scanner.Text())); endpointText != "" {
-			if endpointTmpl, err := getTemplate(endpointText); err != nil {
-				panic(err)
-			} else {
-				fetchMany(endpointTmpl, &sep, limiter)
-			}
+		if endpointTmpl, err := getTemplate(scanner.Text()); err != nil {
+			panic(err)
+		} else {
+			fetchMany(endpointTmpl, limiter, outputs)
 		}
 	}
 
@@ -59,11 +58,51 @@ func execute(rate int) {
 		panic(err)
 	}
 
+	closeOutput(outputs)
 	log.Println("done")
 }
 
+func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
+	outFile, ok := outputs[outName]
+
+	if !ok {
+		if outName != "" {
+			var err error
+			if outFile, err = os.OpenFile(outName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755); err != nil {
+				panic(err)
+			}
+		} else {
+			outFile = os.Stdout
+		}
+
+		if separator, ok := os.LookupEnv("START"); ok {
+			outFile.WriteString(separator)
+		}
+	}
+
+	if separator, ok := os.LookupEnv("SEPARATOR"); ok {
+		outFile.WriteString(separator)
+	} else {
+		outFile.WriteString("\n")
+	}
+
+	if out, err := json.Marshal(row); err != nil {
+		panic(err)
+	} else {
+		outFile.Write(out)
+	}
+}
+
+func closeOutput(outputs map[string]*os.File) {
+	if separator, ok := os.LookupEnv("END"); ok {
+		for _, val := range outputs {
+			val.WriteString(separator)
+		}
+	}
+}
+
 func getTemplate(input string) (*template.Template, error) {
-	if endpointText := strings.TrimSpace(os.ExpandEnv(input)); endpointText != "" {
+	if text := strings.TrimSpace(os.ExpandEnv(input)); text != "" {
 		counters := map[string]int{}
 		funcMap := template.FuncMap{
 			"counter": func(key string, step int, start int) int {
@@ -81,33 +120,53 @@ func getTemplate(input string) (*template.Template, error) {
 					return true
 				}
 			},
+			"last": func(records interface{}) interface{} {
+				if array, ok := records.([]interface{}); ok && len(array) > 0 {
+					return array[len(array)-1]
+				} else {
+					return nil
+				}
+			},
 		}
-		if endpointTmpl, err := template.New("endpoint").Funcs(funcMap).Parse(endpointText); err != nil {
+		if tmpl, err := template.New("endpoint").Funcs(funcMap).Parse(text); err != nil {
 			return nil, err
 		} else {
-			return endpointTmpl, nil
+			return tmpl, nil
 		}
 	}
 	return nil, fmt.Errorf("invalid template")
 }
 
-func getRequest(tmpl *template.Template, data interface{}) (string, error) {
-	var tpl bytes.Buffer
-	if err := tmpl.Execute(&tpl, data); err != nil {
-		return "", err
+func executeTmpl(tmpl *template.Template, data interface{}) string {
+	if tmpl == nil {
+		return ""
 	} else {
-		return tpl.String(), nil
+		var tpl bytes.Buffer
+		if err := tmpl.Execute(&tpl, data); err != nil {
+			panic(err)
+		} else {
+			return tpl.String()
+		}
 	}
 }
 
-func printRow(row interface{}, sep *string) {
-	s := *sep
-	*sep = "\n"
-	if out, err := json.Marshal(row); err != nil {
-		panic(err)
+func processRow(outName string, row interface{}, outputs map[string]*os.File) {
+	if path, ok := os.LookupEnv("JSONPATH"); ok && path != "" {
+		if actual, err := jsonpath.Read(row, path); err != nil {
+			panic(err)
+		} else {
+			row = actual
+		}
+	}
+
+	if split, ok := os.LookupEnv("SPLIT"); ok && (strings.ToUpper(split) == "TRUE" || split == "1") {
+		if splitted, ok := row.([]interface{}); ok {
+			for _, splittedRow := range splitted {
+				writeOutput(outName, outputs, splittedRow)
+			}
+		}
 	} else {
-		os.Stdout.WriteString(s)
-		os.Stdout.Write(out)
+		writeOutput(outName, outputs, row)
 	}
 }
 
@@ -152,38 +211,50 @@ func sendRequest(url string) (interface{}, error) {
 	}
 }
 
-func fetchMany(endpointTmpl *template.Template, sep *string, limiter ratelimit.Limiter) {
-	if endpoint, err := getRequest(endpointTmpl, map[string]interface{}{
+func fetchMany(endpointTmpl *template.Template, limiter ratelimit.Limiter, outputs map[string]*os.File) {
+	data := map[string]interface{}{
 		"lastEndpoint": "",
 		"lastRecord":   nil,
-	}); err != nil {
-		panic(err)
-	} else if endpoint != "" {
+	}
+	if endpoint := executeTmpl(endpointTmpl, data); endpoint != "" {
+		var err error
+		var outTmpl *template.Template = nil
+
+		if outText, ok := os.LookupEnv("OUT"); ok {
+			if outTmpl, err = getTemplate(outText); err != nil {
+				panic(err)
+			}
+		}
+
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else if res != nil {
-			printRow(res, sep)
-			fetchManyRecursive(endpointTmpl, endpoint, res, sep, limiter)
+			data = map[string]interface{}{
+				"lastEndpoint": endpoint,
+				"lastRecord":   res,
+			}
+			processRow(executeTmpl(outTmpl, data), res, outputs)
+			fetchManyRecursive(endpointTmpl, outTmpl, data, endpoint, res, limiter, outputs)
 		}
 	}
 }
 
-func fetchManyRecursive(endpointTmpl *template.Template, lastEndpoint string, lastRecord interface{}, sep *string, limiter ratelimit.Limiter) {
-	if endpoint, err := getRequest(endpointTmpl, map[string]interface{}{
-		"lastEndpoint": lastEndpoint,
-		"lastRecord":   lastRecord,
-	}); err != nil {
-		panic(err)
-	} else if endpoint != "" && endpoint != lastEndpoint {
+func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Template, data interface{}, lastEndpoint string, lastRecord interface{}, limiter ratelimit.Limiter, outputs map[string]*os.File) {
+
+	if endpoint := executeTmpl(endpointTmpl, data); endpoint != "" && endpoint != lastEndpoint {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else if res != nil {
-			printRow(res, sep)
-			fetchManyRecursive(endpointTmpl, lastEndpoint, res, sep, limiter)
+			data = map[string]interface{}{
+				"lastEndpoint": endpoint,
+				"lastRecord":   res,
+			}
+			processRow(executeTmpl(outTmpl, data), res, outputs)
+			fetchManyRecursive(endpointTmpl, outTmpl, data, lastEndpoint, res, limiter, outputs)
 		}
 	}
 }
