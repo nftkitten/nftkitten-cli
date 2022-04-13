@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -66,6 +67,7 @@ func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
 
 	if !ok {
 		if outName != "" {
+			os.MkdirAll(filepath.Dir(outName), os.ModePerm)
 			var err error
 			if outFile, err = os.OpenFile(outName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755); err != nil {
 				panic(err)
