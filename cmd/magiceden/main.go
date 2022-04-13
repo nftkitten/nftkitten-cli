@@ -99,7 +99,6 @@ func closeOutput(outputs map[string]*os.File) {
 		if separator != "" {
 			val.WriteString(separator)
 		}
-		val.WriteString(separator)
 		if outName != "" {
 			val.Close()
 		}
