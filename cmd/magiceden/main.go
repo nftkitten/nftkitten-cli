@@ -77,6 +77,8 @@ func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
 		if separator, ok := os.LookupEnv("START"); ok {
 			outFile.WriteString(separator)
 		}
+
+		outputs[outName] = outFile
 	} else {
 		if separator, ok := os.LookupEnv("SEPARATOR"); ok {
 			outFile.WriteString(separator)
