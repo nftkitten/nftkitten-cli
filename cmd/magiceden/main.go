@@ -43,7 +43,6 @@ func lookupEnvToI(key string, defVal int) int {
 func execute(rate int) {
 	limiter := ratelimit.New(rate)
 	scanner := bufio.NewScanner(os.Stdin)
-
 	outputs := make(map[string]*os.File)
 
 	for scanner.Scan() {
@@ -78,12 +77,12 @@ func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
 		if separator, ok := os.LookupEnv("START"); ok {
 			outFile.WriteString(separator)
 		}
-	}
-
-	if separator, ok := os.LookupEnv("SEPARATOR"); ok {
-		outFile.WriteString(separator)
 	} else {
-		outFile.WriteString("\n")
+		if separator, ok := os.LookupEnv("SEPARATOR"); ok {
+			outFile.WriteString(separator)
+		} else {
+			outFile.WriteString("\n")
+		}
 	}
 
 	if out, err := json.Marshal(row); err != nil {
