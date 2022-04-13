@@ -244,7 +244,6 @@ func fetchMany(endpointTmpl *template.Template, limiter ratelimit.Limiter, outpu
 }
 
 func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Template, data interface{}, lastEndpoint string, lastRecord interface{}, limiter ratelimit.Limiter, outputs map[string]*os.File) {
-
 	if endpoint := executeTmpl(endpointTmpl, data); endpoint != "" && endpoint != lastEndpoint {
 		limiter.Take()
 
