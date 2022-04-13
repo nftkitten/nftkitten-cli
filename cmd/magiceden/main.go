@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -62,15 +63,32 @@ func execute(rate int) {
 	log.Println("done")
 }
 
-func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
-	outFile, ok := outputs[outName]
+func writeOutput(outTmpl *template.Template, outputs map[string]*os.File, row interface{}) {
+	outPath := executeTmpl(outTmpl, row)
+	outFile, ok := outputs[outPath]
 
 	if !ok {
-		if outName != "" {
-			os.MkdirAll(filepath.Dir(outName), os.ModePerm)
+		if outPath != "" {
+			os.MkdirAll(filepath.Dir(outPath), os.ModePerm)
 			var err error
-			if outFile, err = os.OpenFile(outName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755); err != nil {
+			if outFile, err = os.OpenFile(outPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755); err != nil {
 				panic(err)
+			}
+
+			if touch, ok := os.LookupEnv("TOUCH"); ok {
+				if touchTmpl, err := getTemplate(touch); err != nil {
+					panic(err)
+				} else if touchPath := executeTmpl(touchTmpl, row); touch != "" {
+					os.Create(touchPath)
+
+					if files, err := ioutil.ReadDir(filepath.Dir(touchPath)); err == nil {
+						for _, f := range files {
+							if f.Name() != filepath.Base(touchPath) && f.Name() != filepath.Base(outPath) {
+								os.Remove(f.Name())
+							}
+						}
+					}
+				}
 			}
 		} else {
 			outFile = os.Stdout
@@ -80,7 +98,7 @@ func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
 			outFile.WriteString(separator)
 		}
 
-		outputs[outName] = outFile
+		outputs[outPath] = outFile
 	} else {
 		if separator, ok := os.LookupEnv("SEPARATOR"); ok {
 			outFile.WriteString(separator)
@@ -158,7 +176,7 @@ func executeTmpl(tmpl *template.Template, data interface{}) string {
 	}
 }
 
-func processRow(outName string, row interface{}, outputs map[string]*os.File) {
+func processRow(outTmpl *template.Template, row interface{}, outputs map[string]*os.File) {
 	if path, ok := os.LookupEnv("JSONPATH"); ok && path != "" {
 		if actual, err := jsonpath.Read(row, path); err != nil {
 			panic(err)
@@ -169,10 +187,10 @@ func processRow(outName string, row interface{}, outputs map[string]*os.File) {
 
 	if splitted, ok := row.([]interface{}); ok {
 		for _, splittedRow := range splitted {
-			writeOutput(outName, outputs, splittedRow)
+			writeOutput(outTmpl, outputs, splittedRow)
 		}
 	} else {
-		writeOutput(outName, outputs, row)
+		writeOutput(outTmpl, outputs, row)
 	}
 }
 
@@ -241,7 +259,7 @@ func fetchMany(endpointTmpl *template.Template, limiter ratelimit.Limiter, outpu
 				"lastEndpoint": endpoint,
 				"lastRecord":   res,
 			}
-			processRow(executeTmpl(outTmpl, data), res, outputs)
+			processRow(outTmpl, res, outputs)
 			fetchManyRecursive(endpointTmpl, outTmpl, data, endpoint, res, limiter, outputs)
 		}
 	}
@@ -258,7 +276,7 @@ func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Templ
 				"lastEndpoint": endpoint,
 				"lastRecord":   res,
 			}
-			processRow(executeTmpl(outTmpl, data), res, outputs)
+			processRow(outTmpl, res, outputs)
 			fetchManyRecursive(endpointTmpl, outTmpl, data, lastEndpoint, res, limiter, outputs)
 		}
 	}
