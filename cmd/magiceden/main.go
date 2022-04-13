@@ -161,7 +161,7 @@ func processRow(outName string, row interface{}, outputs map[string]*os.File) {
 		}
 	}
 
-	if split, ok := os.LookupEnv("SPLIT"); ok && (strings.ToUpper(split) == "TRUE" || split == "1") {
+	if split, ok := os.LookupEnv("SPLIT"); ok && split != "" {
 		if splitted, ok := row.([]interface{}); ok {
 			for _, splittedRow := range splitted {
 				writeOutput(outName, outputs, splittedRow)
