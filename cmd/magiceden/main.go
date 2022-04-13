@@ -161,11 +161,9 @@ func processRow(outName string, row interface{}, outputs map[string]*os.File) {
 		}
 	}
 
-	if split, ok := os.LookupEnv("SPLIT"); ok && split != "" {
-		if splitted, ok := row.([]interface{}); ok {
-			for _, splittedRow := range splitted {
-				writeOutput(outName, outputs, splittedRow)
-			}
+	if splitted, ok := row.([]interface{}); ok {
+		for _, splittedRow := range splitted {
+			writeOutput(outName, outputs, splittedRow)
 		}
 	} else {
 		writeOutput(outName, outputs, row)
