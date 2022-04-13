@@ -93,12 +93,17 @@ func writeOutput(outName string, outputs map[string]*os.File, row interface{}) {
 }
 
 func closeOutput(outputs map[string]*os.File) {
-	if separator, ok := os.LookupEnv("END"); ok {
-		for outName, val := range outputs {
+	var separator string
+	if separator, ok := os.LookupEnv("END"); !ok {
+		separator = ""
+	}
+	for outName, val := range outputs {
+		if separator != "" {
 			val.WriteString(separator)
-			if outName != "" {
-				val.Close()
-			}
+		}
+		val.WriteString(separator)
+		if outName != "" {
+			val.Close()
 		}
 	}
 }
