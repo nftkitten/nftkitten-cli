@@ -62,8 +62,12 @@ func execute(rate int) {
 	log.Println("done")
 }
 
-func writeOutput(outTmpl *template.Template, separator string, outputs map[string]*os.File, row interface{}) {
-	outPath := executeTmpl(outTmpl, row)
+func writeOutput(outTmpl *template.Template, separator string, outputs map[string]*os.File, lastEndpoint string, lastRecord interface{}) {
+	data := map[string]interface{}{
+		"lastEndpoint": lastEndpoint,
+		"lastRecord":   lastRecord,
+	}
+	outPath := executeTmpl(outTmpl, data)
 	outFile, ok := outputs[outPath]
 
 	if !ok {
@@ -86,7 +90,7 @@ func writeOutput(outTmpl *template.Template, separator string, outputs map[strin
 		outFile.WriteString(separator)
 	}
 
-	if out, err := json.Marshal(row); err != nil {
+	if out, err := json.Marshal(lastRecord); err != nil {
 		panic(err)
 	} else {
 		outFile.Write(out)
@@ -155,25 +159,25 @@ func executeTmpl(tmpl *template.Template, data interface{}) string {
 	}
 }
 
-func processRow(outTmpl *template.Template, row interface{}, outputs map[string]*os.File) {
+func processRow(outTmpl *template.Template, lastEndpoint string, lastRecord interface{}, outputs map[string]*os.File) {
 	if path, ok := os.LookupEnv("JSONPATH"); ok && path != "" {
-		if actual, err := jsonpath.Read(row, path); err != nil {
+		if actual, err := jsonpath.Read(lastRecord, path); err != nil {
 			panic(err)
 		} else {
-			row = actual
+			lastRecord = actual
 		}
 	}
 
 	if separator, ok := os.LookupEnv("SPLIT"); ok {
-		if splitted, ok := row.([]interface{}); ok {
+		if splitted, ok := lastRecord.([]interface{}); ok {
 			for _, splittedRow := range splitted {
-				writeOutput(outTmpl, separator, outputs, splittedRow)
+				writeOutput(outTmpl, separator, outputs, lastEndpoint, splittedRow)
 			}
 		}
 	} else if separator, ok := os.LookupEnv("SEPARATOR"); ok {
-		writeOutput(outTmpl, separator, outputs, row)
+		writeOutput(outTmpl, separator, outputs, lastEndpoint, lastRecord)
 	} else {
-		writeOutput(outTmpl, "\n", outputs, row)
+		writeOutput(outTmpl, "\n", outputs, lastEndpoint, lastRecord)
 	}
 }
 
@@ -223,6 +227,7 @@ func fetchMany(endpointTmpl *template.Template, limiter ratelimit.Limiter, outpu
 		"lastEndpoint": "",
 		"lastRecord":   nil,
 	}
+
 	if endpoint := executeTmpl(endpointTmpl, data); endpoint != "" {
 		var err error
 		var outTmpl *template.Template = nil
@@ -238,29 +243,26 @@ func fetchMany(endpointTmpl *template.Template, limiter ratelimit.Limiter, outpu
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else if res != nil {
-			data = map[string]interface{}{
-				"lastEndpoint": endpoint,
-				"lastRecord":   res,
-			}
-			processRow(outTmpl, res, outputs)
-			fetchManyRecursive(endpointTmpl, outTmpl, data, endpoint, res, limiter, outputs)
+			processRow(outTmpl, endpoint, res, outputs)
+			fetchManyRecursive(endpointTmpl, outTmpl, endpoint, res, limiter, outputs)
 		}
 	}
 }
 
-func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Template, data interface{}, lastEndpoint string, lastRecord interface{}, limiter ratelimit.Limiter, outputs map[string]*os.File) {
+func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Template, lastEndpoint string, lastRecord interface{}, limiter ratelimit.Limiter, outputs map[string]*os.File) {
+	data := map[string]interface{}{
+		"lastEndpoint": lastEndpoint,
+		"lastRecord":   lastRecord,
+	}
+
 	if endpoint := executeTmpl(endpointTmpl, data); endpoint != "" && endpoint != lastEndpoint {
 		limiter.Take()
 
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else if res != nil {
-			data = map[string]interface{}{
-				"lastEndpoint": endpoint,
-				"lastRecord":   res,
-			}
-			processRow(outTmpl, res, outputs)
-			fetchManyRecursive(endpointTmpl, outTmpl, data, lastEndpoint, res, limiter, outputs)
+			processRow(outTmpl, lastEndpoint, res, outputs)
+			fetchManyRecursive(endpointTmpl, outTmpl, lastEndpoint, res, limiter, outputs)
 		}
 	}
 }
