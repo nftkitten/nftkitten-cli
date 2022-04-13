@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -63,7 +62,7 @@ func execute(rate int) {
 	log.Println("done")
 }
 
-func writeOutput(outTmpl *template.Template, outputs map[string]*os.File, row interface{}) {
+func writeOutput(outTmpl *template.Template, separator string, outputs map[string]*os.File, row interface{}) {
 	outPath := executeTmpl(outTmpl, row)
 	outFile, ok := outputs[outPath]
 
@@ -74,37 +73,17 @@ func writeOutput(outTmpl *template.Template, outputs map[string]*os.File, row in
 			if outFile, err = os.OpenFile(outPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755); err != nil {
 				panic(err)
 			}
-
-			if touch, ok := os.LookupEnv("TOUCH"); ok {
-				if touchTmpl, err := getTemplate(touch); err != nil {
-					panic(err)
-				} else if touchPath := executeTmpl(touchTmpl, row); touch != "" {
-					os.Create(touchPath)
-
-					if files, err := ioutil.ReadDir(filepath.Dir(touchPath)); err == nil {
-						for _, f := range files {
-							if f.Name() != filepath.Base(touchPath) && f.Name() != filepath.Base(outPath) {
-								os.Remove(f.Name())
-							}
-						}
-					}
-				}
-			}
 		} else {
 			outFile = os.Stdout
 		}
 
-		if separator, ok := os.LookupEnv("START"); ok {
-			outFile.WriteString(separator)
+		if start, ok := os.LookupEnv("START"); ok {
+			outFile.WriteString(start)
 		}
 
 		outputs[outPath] = outFile
 	} else {
-		if separator, ok := os.LookupEnv("SEPARATOR"); ok {
-			outFile.WriteString(separator)
-		} else {
-			outFile.WriteString("\n")
-		}
+		outFile.WriteString(separator)
 	}
 
 	if out, err := json.Marshal(row); err != nil {
@@ -185,12 +164,16 @@ func processRow(outTmpl *template.Template, row interface{}, outputs map[string]
 		}
 	}
 
-	if splitted, ok := row.([]interface{}); ok {
-		for _, splittedRow := range splitted {
-			writeOutput(outTmpl, outputs, splittedRow)
+	if separator, ok := os.LookupEnv("SPLIT"); ok {
+		if splitted, ok := row.([]interface{}); ok {
+			for _, splittedRow := range splitted {
+				writeOutput(outTmpl, separator, outputs, splittedRow)
+			}
 		}
+	} else if separator, ok := os.LookupEnv("SEPARATOR"); ok {
+		writeOutput(outTmpl, separator, outputs, row)
 	} else {
-		writeOutput(outTmpl, outputs, row)
+		writeOutput(outTmpl, "\n", outputs, row)
 	}
 }
 
