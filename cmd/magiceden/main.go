@@ -261,7 +261,7 @@ func fetchManyRecursive(endpointTmpl *template.Template, outTmpl *template.Templ
 		if res, err := sendRequest(endpoint); err != nil {
 			panic(err)
 		} else if res != nil {
-			processRow(outTmpl, lastEndpoint, res, outputs)
+			processRow(outTmpl, endpoint, res, outputs)
 			fetchManyRecursive(endpointTmpl, outTmpl, lastEndpoint, res, limiter, outputs)
 		}
 	}
